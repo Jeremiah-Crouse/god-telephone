@@ -68,7 +68,7 @@ io.on("connection", (socket) => {
 
     try {
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           ...history.map(m => ({
