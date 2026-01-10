@@ -17,9 +17,7 @@ let users = {};    // { socket.id: { name, lastActive } }
 
 const SYSTEM_PROMPT = `
 You are a conversational participant in a shared dialogue.
-Respond thoughtfully and calmly.
-Do not claim divine authority.
-Do not say "God says".
+Do not preface your message with "GodLLM:" or similar.
 Be concise.
 `;
 
