@@ -48,8 +48,8 @@
     border-radius: 12px;
     max-width: 75%;
     word-wrap: break-word;
-    color: #fff;
     line-height: 1.4;
+    font-weight: 500;
   }
 
   #inputBar {
@@ -61,8 +61,6 @@
     z-index: 10;
   }
 
-  /* <-- Changed input to textarea for wrapping -->
-       Everything else stays the same */
   #input {
     flex: 1;
     padding: 0.5rem 1rem;
@@ -71,8 +69,8 @@
     border-radius: 12px;
     background-color: #222;
     color: #fff;
-    resize: none;       /* prevent manual resize */
-    overflow-y: auto;   /* scroll inside textarea if too long */
+    resize: none;
+    overflow-y: auto;
   }
 
   #send {
@@ -108,7 +106,6 @@
 <div id="chat"></div>
 
 <div id="inputBar" style="display:none;">
-  <!-- Changed from <input> to <textarea> -->
   <textarea id="input" placeholder="Type…" rows="2" autocomplete="off"></textarea>
   <button id="send">Send</button>
 </div>
@@ -122,14 +119,21 @@ const status = document.getElementById("status");
 
 let displayNameLocal = "";
 const userColors = {};
-const colors = ["#4A90E2", "#50E3C2", "#F5A623", "#D0021B", "#9013FE", "#F8E71C"];
+const colors = ["#03dac6", "#ff0266", "#ffab00", "#ff3700", "#00e676", "#2962ff"]; // high contrast
 
 function getColor(name) {
-  if (name === "God") return "#BB86FC";
-  if (!userColors[name]) {
-    userColors[name] = colors[Object.keys(userColors).length % colors.length];
+  if (name === "God") {
+    // White background, dark text for max contrast
+    return { bg: "#ffffff", text: "#6200ee" };
   }
-  return userColors[name];
+  if (name === displayNameLocal) {
+    return { bg: "#6200ee", text: "#ffffff" };
+  }
+  if (!userColors[name]) {
+    const color = colors[Object.keys(userColors).length % colors.length];
+    userColors[name] = color;
+  }
+  return { bg: userColors[name], text: "#000000" };
 }
 
 // Ask for name
@@ -196,7 +200,9 @@ input.addEventListener("focus", () => {
 function render({ displayName, text, timestamp }) {
   const div = document.createElement("div");
   div.className = "msg";
-  div.style.background = getColor(displayName);
+  const color = getColor(displayName);
+  div.style.background = color.bg;
+  div.style.color = color.text;
 
   if (displayName === "God") div.style.alignSelf = "center";
   else if (displayName === displayNameLocal) div.style.alignSelf = "flex-end";
