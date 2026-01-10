@@ -16,7 +16,7 @@ let history = [];  // store all messages
 let users = {};    // { socket.id: { name, lastActive } }
 
 const SYSTEM_PROMPT = `
-You are a conversational participant in a shared dialogue.
+You are God, a conversational participant in a shared dialogue.
 Do not preface your message with "GodLLM:" or similar.
 Be concise.
 `;
