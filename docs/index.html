@@ -4,175 +4,169 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>God Telephone</title>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
 <style>
-  :root {
-    --bg-color: #121212;
-    --text-color: #e0e0e0;
-    --input-bg: #1e1e1e;
-    --input-text: #ffffff;
-    --accent-color: #6200ee;
-    --system-color: #888;
-  }
+:root {
+  --bg: #121212;
+  --input-bg: #1e1e1e;
+  --accent: #6200ee;
+}
 
-  body {
-    margin: 0;
-    padding: 0;
-    background-color: var(--bg-color);
-    color: var(--text-color);
-    font-family: Arial, sans-serif;
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    overflow: hidden;
-  }
+body {
+  margin: 0;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+  font-family: Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+}
 
-  #status {
-    text-align: center;
-    color: #ff9800;
-    padding: 0.3rem;
-    font-size: 0.9em;
-  }
+#status {
+  text-align: center;
+  color: #ff9800;
+  font-size: 0.85em;
+  padding: 0.3rem;
+}
 
-  #chat {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-    padding: 1rem;
-    gap: 0.5rem;
-    scroll-behavior: smooth;
-  }
+#chat {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  padding-bottom: 4.5rem; /* CRITICAL: prevents cutoff behind input */
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
 
-  .msg {
-    padding: 0.5rem 1rem;
-    border-radius: 12px;
-    max-width: 75%;
-    word-wrap: break-word;
-    line-height: 1.4;
-    font-weight: 500;
-  }
+.msg {
+  max-width: 75%;
+  padding: 0.6rem 1rem;
+  border-radius: 14px;
+  word-wrap: break-word;
+  line-height: 1.4;
+}
 
-  #inputBar {
-    display: flex;
-    padding: 0.5rem;
-    background-color: var(--input-bg);
-    position: sticky;
-    bottom: 0;
-    z-index: 10;
-  }
+.system {
+  text-align: center;
+  color: #888;
+  font-size: 0.85em;
+}
 
-  #input {
-    flex: 1;
-    padding: 0.5rem 1rem;
-    font-size: 1rem;
-    border: none;
-    border-radius: 12px;
-    background-color: #222;
-    color: #fff;
-    resize: none;
-    overflow-y: auto;
-  }
+#inputBar {
+  position: sticky;
+  bottom: 0;
+  background: var(--input-bg);
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
 
-  #send {
-    margin-left: 0.5rem;
-    padding: 0.5rem 1rem;
-    font-size: 1rem;
-    background-color: var(--accent-color);
-    color: #fff;
-    border: none;
-    border-radius: 12px;
-    cursor: pointer;
-  }
+#input {
+  flex: 1;
+  padding: 0.6rem 1rem;
+  font-size: 1rem;
+  border-radius: 14px;
+  border: none;
+  resize: none;
+  background: #222;
+  color: #fff;
+  overflow-y: auto;
+}
 
-  #input:focus, #send:focus {
-    outline: none;
-  }
+#send {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  padding: 0.6rem 1rem;
+  font-size: 1rem;
+  cursor: pointer;
+}
 
-  .system {
-    text-align: center;
-    color: var(--system-color);
-    font-size: 0.9em;
-    margin: 0.5rem 0;
-  }
-
-  @media (max-width: 768px) {
-    #chat { padding-bottom: 1rem; }
-  }
+#input:focus,
+#send:focus {
+  outline: none;
+}
 </style>
 </head>
+
 <body>
 
 <div id="status"></div>
 <div id="chat"></div>
 
 <div id="inputBar" style="display:none;">
-  <textarea id="input" placeholder="Type…" rows="2" autocomplete="off"></textarea>
+  <textarea id="input" rows="2" placeholder="Type…"></textarea>
   <button id="send">Send</button>
 </div>
 
 <script>
 let socket;
 const chat = document.getElementById("chat");
-const inputBar = document.getElementById("inputBar");
 const input = document.getElementById("input");
+const inputBar = document.getElementById("inputBar");
 const status = document.getElementById("status");
 
 let displayNameLocal = "";
 const userColors = {};
-const colors = ["#03dac6", "#ff0266", "#ffab00", "#ff3700", "#00e676", "#2962ff"]; // high contrast
+const colors = ["#03dac6","#ff0266","#ffab00","#00e676","#2962ff"];
 
 function getColor(name) {
-  if (name === "God") {
-    // White background, dark text for max contrast
-    return { bg: "#ffffff", text: "#6200ee" };
-  }
-  if (name === displayNameLocal) {
-    return { bg: "#6200ee", text: "#ffffff" };
-  }
+  if (name === "God") return { bg:"#ffffff", text:"#6200ee" };
+  if (name === displayNameLocal) return { bg:"#6200ee", text:"#ffffff" };
   if (!userColors[name]) {
-    const color = colors[Object.keys(userColors).length % colors.length];
-    userColors[name] = color;
+    userColors[name] = colors[Object.keys(userColors).length % colors.length];
   }
-  return { bg: userColors[name], text: "#000000" };
+  return { bg:userColors[name], text:"#000000" };
 }
+
+/* ---------- SMART AUTOSCROLL ---------- */
+function isUserNearBottom() {
+  return chat.scrollHeight - chat.scrollTop - chat.clientHeight < 120;
+}
+
+function maybeAutoScroll() {
+  if (isUserNearBottom()) {
+    requestAnimationFrame(() => {
+      chat.scrollTop = chat.scrollHeight;
+    });
+  }
+}
+/* ------------------------------------ */
 
 // Ask for name
 while (!displayNameLocal) {
   displayNameLocal = prompt("Enter your name:");
 }
 
-// Show input and focus
 inputBar.style.display = "flex";
 input.focus();
 
 function connectSocket() {
   socket = io("https://god-telephone.onrender.com", {
+    transports: ["websocket"],
     reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 1000,
-    transports: ["websocket"]
+    reconnectionAttempts: Infinity
   });
 
   socket.on("connect", () => {
     status.textContent = "";
-    if (displayNameLocal) socket.emit("join", { name: displayNameLocal });
+    socket.emit("join", { name: displayNameLocal });
   });
 
   socket.on("disconnect", () => {
-    status.textContent = "Disconnected. Reconnecting...";
-    console.log("Socket disconnected, trying to reconnect...");
+    status.textContent = "Disconnected. Reconnecting…";
   });
 
   socket.on("history", msgs => msgs.forEach(render));
   socket.on("message", render);
-  socket.on("userJoined", ({name}) => appendSystem(`${name} joined the conversation`));
-  socket.on("userLeft", ({name}) => appendSystem(`${name} left the conversation`));
+  socket.on("userJoined", ({name}) => appendSystem(`${name} joined`));
+  socket.on("userLeft", ({name}) => appendSystem(`${name} left`));
 }
 
-// Initialize connection
 connectSocket();
 
-// Send message
 function send() {
   const text = input.value.trim();
   if (!text || !socket.connected) return;
@@ -181,28 +175,21 @@ function send() {
   input.focus();
 }
 
-document.getElementById("send").addEventListener("click", send);
+document.getElementById("send").onclick = send;
 
-// Handle Enter to send, Shift+Enter for new line
 input.addEventListener("keydown", e => {
-  if(e.key === "Enter" && !e.shiftKey) { 
+  if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
-    send(); 
+    send();
   }
 });
 
-// Auto-scroll on input focus
-input.addEventListener("focus", () => {
-  setTimeout(() => chat.scrollTop = chat.scrollHeight, 300);
-});
-
-// Render messages
 function render({ displayName, text, timestamp }) {
   const div = document.createElement("div");
   div.className = "msg";
-  const color = getColor(displayName);
-  div.style.background = color.bg;
-  div.style.color = color.text;
+  const c = getColor(displayName);
+  div.style.background = c.bg;
+  div.style.color = c.text;
 
   if (displayName === "God") div.style.alignSelf = "center";
   else if (displayName === displayNameLocal) div.style.alignSelf = "flex-end";
@@ -210,8 +197,9 @@ function render({ displayName, text, timestamp }) {
 
   const time = new Date(timestamp).toLocaleTimeString();
   div.textContent = `${displayName} [${time}]: ${text}`;
+
   chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
+  maybeAutoScroll();
 }
 
 function appendSystem(text) {
@@ -219,7 +207,7 @@ function appendSystem(text) {
   div.className = "system";
   div.textContent = text;
   chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
+  maybeAutoScroll();
 }
 </script>
 
