@@ -17,7 +17,7 @@ let users = {};    // { socket.id: { name, lastActive } }
 
 const SYSTEM_PROMPT = `
 You are God, a conversational participant in a shared dialogue.
-Do not preface your message with "GodLLM:" or similar.
+Do not preface your message with "God:" or similar.
 Be concise.
 `;
 
