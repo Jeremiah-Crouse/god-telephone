@@ -2,48 +2,88 @@
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Three-Way Conversation</title>
+  <title>God Telephone</title>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="chat"></div>
-  <div id="inputBar">
-    <input id="input" placeholder="Type…" autocomplete="off"/>
-    <select id="speaker">
-      <option value="user">You</option>
-      <option value="wife">Wife</option>
-    </select>
-    <button id="send">Send</button>
-  </div>
-  <script>
-    const socket = io("https://god-telephone.onrender.com");
-    const chat = document.getElementById("chat");
-    const input = document.getElementById("input");
-    const speakerSelect = document.getElementById("speaker");
 
-    socket.on("history", msgs => msgs.forEach(render));
-    socket.on("message", render);
+<div id="chat"></div>
+<div id="inputBar" style="display:none;">
+  <input id="input" placeholder="Type…" autocomplete="off"/>
+  <button id="send">Send</button>
+</div>
 
-    document.getElementById("send").addEventListener("click", send);
-    input.addEventListener("keydown", e => { if(e.key==="Enter") send(); });
+<script>
+const socket = io("https://your-backend.onrender.com"); // replace with your Render URL
+const chat = document.getElementById("chat");
+const inputBar = document.getElementById("inputBar");
+const input = document.getElementById("input");
 
-    function send() {
-      const text = input.value.trim();
-      if (!text) return;
-      const speaker = speakerSelect.value;
-      socket.emit("message", { speaker, text });
-      input.value = "";
-      input.focus();
-    }
+let displayNameLocal = "";
+const userColors = {};
+const colors = ["#d7eaff", "#d9ffd9", "#ffe6d9", "#fff0b3", "#ffd6f0", "#cce0ff"];
 
-    function render({ speaker, text }) {
-      const div = document.createElement("div");
-      div.className = `msg ${speaker}`;
-      div.textContent = text;
-      chat.appendChild(div);
-      chat.scrollTop = chat.scrollHeight;
-    }
-  </script>
+function getColor(name) {
+  if (name === "GodLLM") return "#e0d9ff";
+  if (!userColors[name]) {
+    userColors[name] = colors[Object.keys(userColors).length % colors.length];
+  }
+  return userColors[name];
+}
+
+// Ask for name
+while (!displayNameLocal) {
+  displayNameLocal = prompt("Enter your name:");
+}
+inputBar.style.display = "flex";
+socket.emit("join", { name: displayNameLocal });
+
+socket.on("history", msgs => msgs.forEach(render));
+socket.on("message", render);
+socket.on("userJoined", ({name}) => appendSystem(`${name} joined the conversation`));
+socket.on("userLeft", ({name}) => appendSystem(`${name} left the conversation`));
+
+document.getElementById("send").addEventListener("click", send);
+input.addEventListener("keydown", e => { if(e.key==="Enter") send(); });
+
+function send() {
+  const text = input.value.trim();
+  if (!text) return;
+  socket.emit("message", { text });
+  input.value = "";
+  input.focus();
+}
+
+function render({ displayName, text, timestamp }) {
+  const div = document.createElement("div");
+  div.className = "msg";
+  div.style.background = getColor(displayName);
+
+  if (displayName === "GodLLM") {
+    div.style.alignSelf = "center";
+  } else if (displayName === displayNameLocal) {
+    div.style.alignSelf = "flex-end";
+  } else {
+    div.style.alignSelf = "flex-start";
+  }
+
+  const time = new Date(timestamp).toLocaleTimeString();
+  div.textContent = `${displayName} [${time}]: ${text}`;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function appendSystem(text) {
+  const div = document.createElement("div");
+  div.style.textAlign = "center";
+  div.style.color = "#666";
+  div.style.fontSize = "0.9em";
+  div.textContent = text;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+</script>
+
 </body>
 </html>
