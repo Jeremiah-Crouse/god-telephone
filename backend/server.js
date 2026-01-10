@@ -79,7 +79,8 @@ io.on("connection", (socket) => {
         temperature: 0.7
       });
 
-      const reply = completion.choices[0].message.content.trim();
+      let reply = completion.choices[0].message.content.trim();
+      reply = reply.replace(/^God:\s*/i, "");
       const llmMsg = { userID: "llm", displayName: "God", text: reply, timestamp: Date.now() };
       history.push(llmMsg);
       io.emit("message", llmMsg);
