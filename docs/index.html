@@ -1,93 +1,159 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>God Telephone</title>
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>God Telephone</title>
+<style>
+  :root {
+    --bg-color: #121212;
+    --text-color: #e0e0e0;
+    --input-bg: #1e1e1e;
+    --input-text: #ffffff;
+    --accent-color: #6200ee;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* Chat container */
+  #chat-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 1rem;
+    scroll-behavior: smooth;
+  }
+
+  .message {
+    margin-bottom: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    max-width: 80%;
+    word-wrap: break-word;
+  }
+
+  .user {
+    background-color: #333;
+    align-self: flex-end;
+  }
+
+  .bot {
+    background-color: #1f1f1f;
+    align-self: flex-start;
+  }
+
+  /* Input area sticky at bottom */
+  #input-container {
+    display: flex;
+    padding: 0.5rem;
+    background-color: var(--input-bg);
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+  }
+
+  #user-input {
+    flex: 1;
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+    border: none;
+    border-radius: 8px;
+    background-color: var(--input-bg);
+    color: var(--input-text);
+  }
+
+  #send-btn {
+    margin-left: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+    background-color: var(--accent-color);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  #user-input:focus, #send-btn:focus {
+    outline: none;
+  }
+
+  /* Mobile adjustments */
+  @media (max-width: 768px) {
+    html, body {
+      height: 100%;
+    }
+    #chat-container {
+      padding-bottom: 1rem; /* extra space so last message isn't hidden behind keyboard */
+    }
+  }
+</style>
 </head>
 <body>
 
-<div id="chat"></div>
-<div id="inputBar" style="display:none;">
-  <input id="input" placeholder="Type…" autocomplete="off"/>
-  <button id="send">Send</button>
+<div id="chat-container"></div>
+
+<div id="input-container">
+  <input type="text" id="user-input" placeholder="Type a message..." autocomplete="off" />
+  <button id="send-btn">Send</button>
 </div>
 
 <script>
-const socket = io("https://god-telephone.onrender.com"); // replace with your Render URL
-const chat = document.getElementById("chat");
-const inputBar = document.getElementById("inputBar");
-const input = document.getElementById("input");
+  const chatContainer = document.getElementById('chat-container');
+  const userInput = document.getElementById('user-input');
+  const sendBtn = document.getElementById('send-btn');
 
-let displayNameLocal = "";
-const userColors = {};
-const colors = ["#d7eaff", "#d9ffd9", "#ffe6d9", "#fff0b3", "#ffd6f0", "#cce0ff"];
-
-function getColor(name) {
-  if (name === "God") return "#e0d9ff";
-  if (!userColors[name]) {
-    userColors[name] = colors[Object.keys(userColors).length % colors.length];
-  }
-  return userColors[name];
-}
-
-// Ask for name
-while (!displayNameLocal) {
-  displayNameLocal = prompt("Enter your name:");
-}
-inputBar.style.display = "flex";
-socket.emit("join", { name: displayNameLocal });
-
-socket.on("history", msgs => msgs.forEach(render));
-socket.on("message", render);
-socket.on("userJoined", ({name}) => appendSystem(`${name} joined the conversation`));
-socket.on("userLeft", ({name}) => appendSystem(`${name} left the conversation`));
-
-document.getElementById("send").addEventListener("click", send);
-input.addEventListener("keydown", e => { if(e.key==="Enter") send(); });
-
-// Auto-scroll on input focus (mobile keyboards)
-input.addEventListener("focus", () => {
-  setTimeout(() => chat.scrollTop = chat.scrollHeight, 300);
-});
-
-function send() {
-  const text = input.value.trim();
-  if (!text) return;
-  socket.emit("message", { text });
-  input.value = "";
-  input.focus();
-}
-
-function render({ displayName, text, timestamp }) {
-  const div = document.createElement("div");
-  div.className = "msg";
-  div.style.background = getColor(displayName);
-
-  if (displayName === "God") {
-    div.style.alignSelf = "center";
-  } else if (displayName === displayNameLocal) {
-    div.style.alignSelf = "flex-end";
-  } else {
-    div.style.alignSelf = "flex-start";
+  function appendMessage(text, sender) {
+    const message = document.createElement('div');
+    message.classList.add('message', sender);
+    message.textContent = text;
+    chatContainer.appendChild(message);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
   }
 
-  const time = new Date(timestamp).toLocaleTimeString();
-  div.textContent = `${displayName} [${time}]: ${text}`;
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
-}
+  async function sendMessage(text) {
+    appendMessage(text, 'user');
 
-function appendSystem(text) {
-  const div = document.createElement("div");
-  div.style.textAlign = "center";
-  div.style.color = "#666";
-  div.style.fontSize = "0.9em";
-  div.textContent = text;
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
-}
+    try {
+      const response = await fetch('https://god-telephone.onrender.com/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text })
+      });
+
+      const data = await response.json();
+      appendMessage(data.reply || 'No reply received.', 'bot');
+    } catch (err) {
+      appendMessage('Error: Could not reach server.', 'bot');
+      console.error(err);
+    }
+  }
+
+  sendBtn.addEventListener('click', () => {
+    const text = userInput.value.trim();
+    if (!text) return;
+    userInput.value = '';
+    sendMessage(text);
+  });
+
+  userInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendBtn.click();
+  });
+
+  // Keep input visible when keyboard opens (especially on iOS)
+  window.addEventListener('resize', () => {
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+  });
 </script>
 
 </body>
