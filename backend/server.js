@@ -75,7 +75,7 @@ io.on("connection", (socket) => {
           { role: "system", content: SYSTEM_PROMPT },
           ...history.map(m => ({
             role: "user",
-            content: `${m.displayName} (${new Date(m.timestamp).toLocaleTimeString()}): ${m.text}`
+            content: `${m.displayName}: ${m.text}`
           }))
         ],
         temperature: 0.7
