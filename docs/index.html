@@ -1,101 +1,106 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>God Telephone</title>
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  <style>
-    :root {
-      --bg-color: #121212;
-      --text-color: #e0e0e0;
-      --input-bg: #1e1e1e;
-      --input-text: #ffffff;
-      --accent-color: #6200ee;
-      --system-color: #888;
-    }
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>God Telephone</title>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<style>
+  :root {
+    --bg-color: #121212;
+    --text-color: #e0e0e0;
+    --input-bg: #1e1e1e;
+    --input-text: #ffffff;
+    --accent-color: #6200ee;
+    --system-color: #888;
+  }
 
-    body {
-      margin: 0;
-      padding: 0;
-      background-color: var(--bg-color);
-      color: var(--text-color);
-      font-family: Arial, sans-serif;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      overflow: hidden;
-    }
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
 
-    #chat {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow-y: auto;
-      padding: 1rem;
-      scroll-behavior: smooth;
-      gap: 0.5rem; /* spacing between messages */
-    }
+  #status {
+    text-align: center;
+    color: #ff9800;
+    padding: 0.3rem;
+    font-size: 0.9em;
+  }
 
-    .msg {
-      padding: 0.5rem 1rem;
-      border-radius: 12px;
-      max-width: 75%;
-      word-wrap: break-word;
-      color: #fff; /* all text white for readability */
-      line-height: 1.4;
-    }
+  #chat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 1rem;
+    gap: 0.5rem;
+    scroll-behavior: smooth;
+  }
 
-    /* Input bar sticky at bottom */
-    #inputBar {
-      display: flex;
-      padding: 0.5rem;
-      background-color: var(--input-bg);
-      position: sticky;
-      bottom: 0;
-      z-index: 10;
-    }
+  .msg {
+    padding: 0.5rem 1rem;
+    border-radius: 12px;
+    max-width: 75%;
+    word-wrap: break-word;
+    color: #fff;
+    line-height: 1.4;
+  }
 
-    #input {
-      flex: 1;
-      padding: 0.5rem 1rem;
-      font-size: 1rem;
-      border: none;
-      border-radius: 12px;
-      background-color: #222;
-      color: #fff;
-    }
+  #inputBar {
+    display: flex;
+    padding: 0.5rem;
+    background-color: var(--input-bg);
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+  }
 
-    #send {
-      margin-left: 0.5rem;
-      padding: 0.5rem 1rem;
-      font-size: 1rem;
-      background-color: var(--accent-color);
-      color: #fff;
-      border: none;
-      border-radius: 12px;
-      cursor: pointer;
-    }
+  #input {
+    flex: 1;
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+    border: none;
+    border-radius: 12px;
+    background-color: #222;
+    color: #fff;
+  }
 
-    #input:focus, #send:focus {
-      outline: none;
-    }
+  #send {
+    margin-left: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+    background-color: var(--accent-color);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+  }
 
-    .system {
-      text-align: center;
-      color: var(--system-color);
-      font-size: 0.9em;
-      margin: 0.5rem 0;
-    }
+  #input:focus, #send:focus {
+    outline: none;
+  }
 
-    @media (max-width: 768px) {
-      #chat {
-        padding-bottom: 1rem;
-      }
-    }
-  </style>
+  .system {
+    text-align: center;
+    color: var(--system-color);
+    font-size: 0.9em;
+    margin: 0.5rem 0;
+  }
+
+  @media (max-width: 768px) {
+    #chat { padding-bottom: 1rem; }
+  }
+</style>
 </head>
 <body>
 
+<div id="status"></div>
 <div id="chat"></div>
 
 <div id="inputBar" style="display:none;">
@@ -104,10 +109,11 @@
 </div>
 
 <script>
-const socket = io("https://god-telephone.onrender.com"); 
+let socket;
 const chat = document.getElementById("chat");
 const inputBar = document.getElementById("inputBar");
 const input = document.getElementById("input");
+const status = document.getElementById("status");
 
 let displayNameLocal = "";
 const userColors = {};
@@ -126,45 +132,63 @@ while (!displayNameLocal) {
   displayNameLocal = prompt("Enter your name:");
 }
 
-// Show chat input bar
+// Show input and focus
 inputBar.style.display = "flex";
-input.focus(); // <-- immediately focus input after name
+input.focus();
 
-socket.emit("join", { name: displayNameLocal });
+function connectSocket() {
+  socket = io("https://god-telephone.onrender.com", {
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    transports: ["websocket"]
+  });
 
-socket.on("history", msgs => msgs.forEach(render));
-socket.on("message", render);
-socket.on("userJoined", ({name}) => appendSystem(`${name} joined the conversation`));
-socket.on("userLeft", ({name}) => appendSystem(`${name} left the conversation`));
+  socket.on("connect", () => {
+    status.textContent = "";
+    if (displayNameLocal) socket.emit("join", { name: displayNameLocal });
+  });
 
-document.getElementById("send").addEventListener("click", send);
-input.addEventListener("keydown", e => { if(e.key==="Enter") send(); });
+  socket.on("disconnect", () => {
+    status.textContent = "Disconnected. Reconnecting...";
+    console.log("Socket disconnected, trying to reconnect...");
+  });
 
-// Auto-scroll on input focus (mobile keyboards)
-input.addEventListener("focus", () => {
-  setTimeout(() => chat.scrollTop = chat.scrollHeight, 300);
-});
+  socket.on("history", msgs => msgs.forEach(render));
+  socket.on("message", render);
+  socket.on("userJoined", ({name}) => appendSystem(`${name} joined the conversation`));
+  socket.on("userLeft", ({name}) => appendSystem(`${name} left the conversation`));
+}
 
+// Initialize connection
+connectSocket();
+
+// Send message
 function send() {
   const text = input.value.trim();
-  if (!text) return;
+  if (!text || !socket.connected) return;
   socket.emit("message", { text });
   input.value = "";
   input.focus();
 }
 
+document.getElementById("send").addEventListener("click", send);
+input.addEventListener("keydown", e => { if(e.key==="Enter") send(); });
+
+// Auto-scroll on input focus
+input.addEventListener("focus", () => {
+  setTimeout(() => chat.scrollTop = chat.scrollHeight, 300);
+});
+
+// Render messages
 function render({ displayName, text, timestamp }) {
   const div = document.createElement("div");
   div.className = "msg";
   div.style.background = getColor(displayName);
 
-  if (displayName === "God") {
-    div.style.alignSelf = "center";
-  } else if (displayName === displayNameLocal) {
-    div.style.alignSelf = "flex-end";
-  } else {
-    div.style.alignSelf = "flex-start";
-  }
+  if (displayName === "God") div.style.alignSelf = "center";
+  else if (displayName === displayNameLocal) div.style.alignSelf = "flex-end";
+  else div.style.alignSelf = "flex-start";
 
   const time = new Date(timestamp).toLocaleTimeString();
   div.textContent = `${displayName} [${time}]: ${text}`;
