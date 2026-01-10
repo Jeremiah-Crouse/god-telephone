@@ -47,6 +47,11 @@ socket.on("userLeft", ({name}) => appendSystem(`${name} left the conversation`))
 document.getElementById("send").addEventListener("click", send);
 input.addEventListener("keydown", e => { if(e.key==="Enter") send(); });
 
+// Auto-scroll on input focus (mobile keyboards)
+input.addEventListener("focus", () => {
+  setTimeout(() => chat.scrollTop = chat.scrollHeight, 300);
+});
+
 function send() {
   const text = input.value.trim();
   if (!text) return;
