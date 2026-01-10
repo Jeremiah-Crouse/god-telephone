@@ -80,7 +80,7 @@ io.on("connection", (socket) => {
       });
 
       const reply = completion.choices[0].message.content.trim();
-      const llmMsg = { userID: "llm", displayName: "GodLLM", text: reply, timestamp: Date.now() };
+      const llmMsg = { userID: "llm", displayName: "God", text: reply, timestamp: Date.now() };
       history.push(llmMsg);
       io.emit("message", llmMsg);
 
