@@ -1,0 +1,11 @@
+body { margin:0; font-family: system-ui, sans-serif; display:flex; flex-direction:column; height:100vh; background:#f6f6f6;}
+#chat { flex:1; overflow-y:auto; padding:1em;}
+.msg { margin:0.4em 0; padding:0.6em 0.9em; border-radius:14px; max-width:85%; word-wrap: break-word; }
+.user { background:#d7eaff; align-self:flex-start; }
+.wife { background:#d9ffd9; align-self:flex-end; }
+.llm { background:#eee0ff; align-self:center; }
+#inputBar { display:flex; padding:0.5em; background:white; box-shadow:0 -1px 5px rgba(0,0,0,0.1);}
+input, select, button { font-size:1em; padding:0.6em; }
+input { flex:1; margin-right:0.4em; border-radius:20px; border:1px solid #ccc; }
+select { border-radius:10px; margin-right:0.4em; }
+button { border-radius:10px; background:#0066cc; color:white; border:none; }

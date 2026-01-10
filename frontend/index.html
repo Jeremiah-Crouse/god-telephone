@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Three-Way Conversation</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="chat"></div>
+  <div id="inputBar">
+    <input id="input" placeholder="Type…" autocomplete="off"/>
+    <select id="speaker">
+      <option value="user">You</option>
+      <option value="wife">Wife</option>
+    </select>
+    <button id="send">Send</button>
+  </div>
+  <script>
+    const socket = io("https://threeway.onrender.com");
+    const chat = document.getElementById("chat");
+    const input = document.getElementById("input");
+    const speakerSelect = document.getElementById("speaker");
+
+    socket.on("history", msgs => msgs.forEach(render));
+    socket.on("message", render);
+
+    document.getElementById("send").addEventListener("click", send);
+    input.addEventListener("keydown", e => { if(e.key==="Enter") send(); });
+
+    function send() {
+      const text = input.value.trim();
+      if (!text) return;
+      const speaker = speakerSelect.value;
+      socket.emit("message", { speaker, text });
+      input.value = "";
+      input.focus();
+    }
+
+    function render({ speaker, text }) {
+      const div = document.createElement("div");
+      div.className = `msg ${speaker}`;
+      div.textContent = text;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+  </script>
+</body>
+</html>
