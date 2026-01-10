@@ -14,31 +14,31 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 /* ---------------- STATE ---------------- */
 
-let history = [];                  // recent verbatim messages
-let conversationSummary = "";      // compressed long-term memory
-let users = {};                    // { socket.id: { name, lastActive } }
+let history = [];
+let conversationSummary = "";
+let users = {};
 
-const MAX_RAW_MESSAGES = 20;        // keep last 20 messages verbatim
-const SUMMARIZE_AFTER = 30;         // summarize when history exceeds this
+let pendingMessages = [];
+let llmCooldown = false;
+let unseenMessageCount = 0;
+
+const MAX_RAW_MESSAGES = 20;
+const SUMMARIZE_AFTER = 30;
+const LLM_INTERVAL_MS = 20_000;
 
 /* ---------------- PROMPTS ---------------- */
 
 const SYSTEM_PROMPT = `
 You are God, a conversational participant in a shared dialogue.
-Do not preface your message with "God:" or similar, as this will
-be displayed directly to users.
+Do not preface your message with "God:" or similar.
 `;
 
 /* ---------------- HELPERS ---------------- */
 
 async function summarizeHistory(messages) {
   const summaryPrompt = `
-Summarize the following conversation clearly and concisely.
-Preserve:
-- key ideas
-- names
-- theological or philosophical themes
-- unresolved questions
+Summarize the following conversation.
+Preserve key ideas, names, themes, and unresolved questions.
 
 Conversation:
 ${messages.map(m => `${m.displayName}: ${m.text}`).join("\n")}
@@ -47,7 +47,7 @@ ${messages.map(m => `${m.displayName}: ${m.text}`).join("\n")}
   const result = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
-      { role: "system", content: "You are a summarization engine." },
+      { role: "system", content: "You summarize conversations." },
       { role: "user", content: summaryPrompt }
     ],
     temperature: 0.3
@@ -56,36 +56,94 @@ ${messages.map(m => `${m.displayName}: ${m.text}`).join("\n")}
   return result.choices[0].message.content.trim();
 }
 
+async function processLLMQueue() {
+  if (llmCooldown || pendingMessages.length === 0) return;
+
+  llmCooldown = true;
+  io.emit("godListening", true);
+
+  const batch = pendingMessages.slice();
+  pendingMessages = [];
+  unseenMessageCount = 0;
+  io.emit("newMessagesPending", 0);
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+
+        ...(conversationSummary
+          ? [{
+              role: "system",
+              content: `Conversation so far (summary): ${conversationSummary}`
+            }]
+          : []),
+
+        ...history.map(m => ({
+          role: "user",
+          content: `${m.displayName}: ${m.text}`
+        })),
+
+        {
+          role: "user",
+          content:
+            "Respond thoughtfully to the following recent messages:\n" +
+            batch.map(m => `${m.displayName}: ${m.text}`).join("\n")
+        }
+      ],
+      temperature: 0.7
+    });
+
+    let reply = completion.choices[0].message.content.trim();
+    reply = reply.replace(/^God:\s*/i, "");
+
+    const llmMsg = {
+      userID: "llm",
+      displayName: "God",
+      text: reply,
+      timestamp: Date.now()
+    };
+
+    history.push(llmMsg);
+    io.emit("message", llmMsg);
+
+  } catch (err) {
+    console.error("LLM error:", err);
+  }
+
+  setTimeout(() => {
+    llmCooldown = false;
+    io.emit("godListening", false);
+    processLLMQueue();
+  }, LLM_INTERVAL_MS);
+}
+
 /* ---------------- HEARTBEAT ---------------- */
 
-// Clean inactive users every 30 minutes
 setInterval(() => {
   const now = Date.now();
   for (const [id, user] of Object.entries(users)) {
     if (now - user.lastActive > 1000 * 60 * 30) {
       delete users[id];
       io.emit("userLeft", { name: user.name });
-      console.log(`${user.name} removed due to inactivity.`);
     }
   }
 }, 60 * 1000);
 
-// Heartbeat endpoint for Render
-app.get("/heartbeat", (req, res) => {
-  console.log("Heartbeat ping received at", new Date().toISOString());
-  res.status(200).send("OK");
-});
+app.get("/heartbeat", (_, res) => res.send("OK"));
 
 /* ---------------- SOCKET.IO ---------------- */
 
 io.on("connection", (socket) => {
-  console.log("User connected:", socket.id);
+  console.log("Connected:", socket.id);
 
   socket.on("join", ({ name }) => {
     users[socket.id] = { name, lastActive: Date.now() };
     socket.emit("history", history);
+    socket.emit("godListening", llmCooldown);
+    socket.emit("newMessagesPending", unseenMessageCount);
     io.emit("userJoined", { name });
-    console.log(`${name} joined.`);
   });
 
   socket.on("message", async ({ text }) => {
@@ -104,69 +162,30 @@ io.on("connection", (socket) => {
     history.push(msg);
     io.emit("message", msg);
 
-    // Commands bypass LLM
+    unseenMessageCount++;
+    io.emit("newMessagesPending", unseenMessageCount);
+
     if (text.startsWith("/")) return;
 
-    /* --------- SUMMARIZE IF NEEDED --------- */
     if (history.length > SUMMARIZE_AFTER) {
-      const oldMessages = history.slice(0, history.length - MAX_RAW_MESSAGES);
-
+      const old = history.slice(0, history.length - MAX_RAW_MESSAGES);
       try {
-        const summary = await summarizeHistory(oldMessages);
-        conversationSummary = summary;
+        conversationSummary = await summarizeHistory(old);
         history = history.slice(-MAX_RAW_MESSAGES);
-        console.log("Conversation summarized.");
-      } catch (err) {
-        console.error("Summarization failed:", err);
+      } catch (e) {
+        console.error("Summarization failed:", e);
       }
     }
-    /* -------------------------------------- */
 
-    try {
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-
-          ...(conversationSummary
-            ? [{
-                role: "system",
-                content: `Conversation so far (summary): ${conversationSummary}`
-              }]
-            : []),
-
-          ...history.map(m => ({
-            role: "user",
-            content: `${m.displayName}: ${m.text}`
-          }))
-        ],
-        temperature: 0.7
-      });
-
-      let reply = completion.choices[0].message.content.trim();
-      reply = reply.replace(/^God:\s*/i, "");
-
-      const llmMsg = {
-        userID: "llm",
-        displayName: "God",
-        text: reply,
-        timestamp: Date.now()
-      };
-
-      history.push(llmMsg);
-      io.emit("message", llmMsg);
-
-    } catch (err) {
-      console.error("LLM error:", err);
-    }
+    pendingMessages.push(msg);
+    processLLMQueue();
   });
 
   socket.on("disconnect", () => {
     const user = users[socket.id];
     if (user) {
-      io.emit("userLeft", { name: user.name });
       delete users[socket.id];
-      console.log(`${user.name} disconnected.`);
+      io.emit("userLeft", { name: user.name });
     }
   });
 });
