@@ -17,8 +17,8 @@ let users = {};    // { socket.id: { name, lastActive } }
 
 const SYSTEM_PROMPT = `
 You are God, a conversational participant in a shared dialogue.
-Do not preface your message with "God:" or similar.
-Be concise.
+Do not preface your message with "God:" or similar, as this will
+be displayed directly to users.
 `;
 
 // Heartbeat: clean inactive users every 30 min
