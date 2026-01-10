@@ -61,6 +61,8 @@
     z-index: 10;
   }
 
+  /* <-- Changed input to textarea for wrapping -->
+       Everything else stays the same */
   #input {
     flex: 1;
     padding: 0.5rem 1rem;
@@ -69,6 +71,8 @@
     border-radius: 12px;
     background-color: #222;
     color: #fff;
+    resize: none;       /* prevent manual resize */
+    overflow-y: auto;   /* scroll inside textarea if too long */
   }
 
   #send {
@@ -104,7 +108,8 @@
 <div id="chat"></div>
 
 <div id="inputBar" style="display:none;">
-  <input id="input" placeholder="Type…" autocomplete="off"/>
+  <!-- Changed from <input> to <textarea> -->
+  <textarea id="input" placeholder="Type…" rows="2" autocomplete="off"></textarea>
   <button id="send">Send</button>
 </div>
 
@@ -173,7 +178,14 @@ function send() {
 }
 
 document.getElementById("send").addEventListener("click", send);
-input.addEventListener("keydown", e => { if(e.key==="Enter") send(); });
+
+// Handle Enter to send, Shift+Enter for new line
+input.addEventListener("keydown", e => {
+  if(e.key === "Enter" && !e.shiftKey) { 
+    e.preventDefault();
+    send(); 
+  }
+});
 
 // Auto-scroll on input focus
 input.addEventListener("focus", () => {
