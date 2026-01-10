@@ -25,7 +25,7 @@ const userColors = {};
 const colors = ["#d7eaff", "#d9ffd9", "#ffe6d9", "#fff0b3", "#ffd6f0", "#cce0ff"];
 
 function getColor(name) {
-  if (name === "GodLLM") return "#e0d9ff";
+  if (name === "God") return "#e0d9ff";
   if (!userColors[name]) {
     userColors[name] = colors[Object.keys(userColors).length % colors.length];
   }
@@ -65,7 +65,7 @@ function render({ displayName, text, timestamp }) {
   div.className = "msg";
   div.style.background = getColor(displayName);
 
-  if (displayName === "GodLLM") {
+  if (displayName === "God") {
     div.style.alignSelf = "center";
   } else if (displayName === displayNameLocal) {
     div.style.alignSelf = "flex-end";
