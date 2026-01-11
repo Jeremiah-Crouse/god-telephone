@@ -45,7 +45,7 @@ ${messages.map(m => `${m.displayName}: ${m.text}`).join("\n")}
 `;
 
   const result = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: "gpt-4.1-mini",
     messages: [
       { role: "system", content: "You summarize conversations." },
       { role: "user", content: summaryPrompt }
