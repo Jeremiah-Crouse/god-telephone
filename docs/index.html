@@ -116,6 +116,7 @@ body {
 <div id="inputBar" style="display:none;">
   <textarea id="input" rows="2" placeholder="Type…"></textarea>
   <button id="send">Send</button>
+  <button id="changeName" style="background:none; color:#888; border:none; cursor:pointer; font-size:0.7rem;">Change Name</button>
 </div>
 
 <script>
@@ -167,17 +168,14 @@ chat.addEventListener("scroll", () => {
 });
 
 /* ---------- NAME ---------- */
-
-// 1. Try to get the name from localStorage first
 displayNameLocal = localStorage.getItem("godTelephoneName");
 
-// 2. If it's not there, keep asking until they provide one
 if (!displayNameLocal) {
-  while (!displayNameLocal) {
     displayNameLocal = prompt("Enter your name:");
-  }
-  // 3. Save it for next time
-  localStorage.setItem("godTelephoneName", displayNameLocal.trim());
+    if (!displayNameLocal || displayNameLocal.trim() === "") {
+        displayNameLocal = "Anonymous_" + Math.floor(Math.random() * 1000);
+    }
+    localStorage.setItem("godTelephoneName", displayNameLocal.trim());
 }
 
 inputBar.style.display = "flex";
@@ -282,6 +280,14 @@ function appendSystem(text) {
   chat.appendChild(div);
   maybeAutoScroll();
 }
+
+document.getElementById("changeName").onclick = () => {
+  if (confirm("Would you like to change your display name?")) {
+    localStorage.removeItem("godTelephoneName");
+    location.reload(); // Refresh to trigger the name prompt logic
+  }
+};
+
 </script>
 
 </body>
