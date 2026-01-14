@@ -168,8 +168,16 @@ chat.addEventListener("scroll", () => {
 
 /* ---------- NAME ---------- */
 
-while (!displayNameLocal) {
-  displayNameLocal = prompt("Enter your name:");
+// 1. Try to get the name from localStorage first
+displayNameLocal = localStorage.getItem("godTelephoneName");
+
+// 2. If it's not there, keep asking until they provide one
+if (!displayNameLocal) {
+  while (!displayNameLocal) {
+    displayNameLocal = prompt("Enter your name:");
+  }
+  // 3. Save it for next time
+  localStorage.setItem("godTelephoneName", displayNameLocal.trim());
 }
 
 inputBar.style.display = "flex";
