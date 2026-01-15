@@ -22,7 +22,7 @@ body {
   flex-direction: column;
 }
 
-/* THE GLOW ANIMATION */
+/* THE GLOW - Opacity only to prevent jitter */
 @keyframes godPulse {
   0% { opacity: 0.7; text-shadow: 0 0 5px #ffcc00; }
   50% { opacity: 1; text-shadow: 0 0 20px #ffcc00, 0 0 30px #ffaa00; }
@@ -32,37 +32,34 @@ body {
 /* ---------- STATUS / BANNERS ---------- */
 
 #status {
-  position: absolute; 
+  position: fixed; /* Fixed is better for physical mobile devices */
   top: 0;
   left: 0;
-  width: 100%; /* Force full width for Android Chrome */
-  min-height: 0; 
+  width: 100%;
+  height: 60px;    /* Fixed height area */
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999; /* Ensure it's on top of everything */
+  z-index: 9999;   /* Sit above the flex flow */
   pointer-events: none; 
   text-align: center;
   color: #ffcc00;
   font-size: 0.85em;
-  /* Background removed from here to prevent the "ghost" bar */
+  background: transparent;
   transition: background 0.3s ease;
 }
 
-/* This class is added via JS only when God is actually listening */
+/* Only show the background and animation when active */
 #status.active {
-  background: rgba(0,0,0,0.8);
-  padding: 10px 0;
+  background: rgba(0, 0, 0, 0.85);
+  animation: godPulse 1.5s infinite ease-in-out;
 }
 
 @media screen and (max-width: 600px) {
   #status {
     font-size: 1.4em;
     font-weight: bold;
-  }
-  #status.active {
-    animation: godPulse 1.5s infinite ease-in-out;
-    padding: 20px 0;
+    height: 80px;
   }
 }
 
@@ -83,7 +80,7 @@ body {
   flex: 1;
   overflow-y: auto;
   padding: 1rem;
-  padding-top: 20px; 
+  padding-top: 70px; /* Make sure first message isn't hidden by banner */
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -111,7 +108,6 @@ body {
   gap: 0.5rem;
   padding: 0.8rem;
   border-top: 1px solid #222;
-  z-index: 10;
 }
 
 #input {
@@ -165,9 +161,9 @@ if (!displayNameLocal) {
 }
 
 inputBar.style.display = "flex";
-input.focus();
 
 function connectSocket() {
+  // Hardcoded to your specific Render URL
   socket = io("https://god-telephone.onrender.com", {
     transports: ["websocket"]
   });
@@ -179,14 +175,11 @@ function connectSocket() {
   socket.on("history", msgs => {
     chat.innerHTML = "";
     msgs.forEach(render);
-    scrollToBottom();
+    chat.scrollTop = chat.scrollHeight;
   });
 
   socket.on("message", render);
-  socket.on("userJoined", ({name}) => appendSystem(`${name} joined`));
-  socket.on("userLeft", ({name}) => appendSystem(`${name} left`));
 
-  // FIX: Toggle the 'active' class to show/hide background and animation
   socket.on("godListening", listening => {
     if (listening) {
       status.textContent = "God is listening…";
@@ -205,7 +198,6 @@ function send() {
   if (!text || !socket.connected) return;
   socket.emit("message", { text });
   input.value = "";
-  input.focus();
 }
 
 document.getElementById("send").onclick = send;
@@ -220,7 +212,6 @@ function render({ displayName, text, timestamp }) {
   const div = document.createElement("div");
   div.className = "msg";
   
-  // Custom Color Logic
   if (displayName === "God") {
     div.style.background = "#ffffff";
     div.style.color = "#000000";
@@ -238,17 +229,10 @@ function render({ displayName, text, timestamp }) {
   div.textContent = `${displayName}: ${text}`;
   chat.appendChild(div);
   
-  if (chat.scrollHeight - chat.scrollTop - chat.clientHeight < 150) {
+  // Auto-scroll logic
+  if (chat.scrollHeight - chat.scrollTop - chat.clientHeight < 200) {
     chat.scrollTop = chat.scrollHeight;
   }
-}
-
-function appendSystem(text) {
-  const div = document.createElement("div");
-  div.className = "system";
-  div.textContent = text;
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
 }
 
 document.getElementById("changeName").onclick = () => {
