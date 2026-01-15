@@ -21,50 +21,48 @@ body {
   display: flex;
   flex-direction: column;
 }
-/* 1. Define the pulsing glow animation */
+/* 3. Modify the Keyframes to use Opacity + Glow (Zero jumping) */
 @keyframes godPulse {
   0% {
-    transform: scale(1);
-    text-shadow: 0 0 5px #ffcc00, 0 0 10px #ffcc00;
+    opacity: 0.7;
+    text-shadow: 0 0 5px #ffcc00;
   }
   50% {
-    transform: scale(1.1);
-    text-shadow: 0 0 15px #ffcc00, 0 0 30px #ffaa00, 0 0 40px #ffaa00;
+    opacity: 1;
+    text-shadow: 0 0 20px #ffcc00, 0 0 30px #ffaa00;
   }
   100% {
-    transform: scale(1);
-    text-shadow: 0 0 5px #ffcc00, 0 0 10px #ffcc00;
+    opacity: 0.7;
+    text-shadow: 0 0 5px #ffcc00;
   }
 }
 
-/* 2. Apply it to the status banner */
-#status {
-  text-align: center;
-  color: #ffcc00;
-  font-size: 0.85em;
-  padding: 0.3rem;
-  transition: all 0.3s ease;
-}
-
-/* 3. Mobile-specific overrides with the animation */
+/* 2. Update the mobile animation to avoid physical layout shifts */
 @media screen and (max-width: 600px) {
   #status {
-    font-size: 1.5em; /* Extra large for mobile */
-    font-weight: 900;
-    padding: 0.8rem;
-    /* This makes it pulse only when God is active */
-    animation: godPulse 1.5s infinite ease-in-out; 
-    display: block;
-    width: 100%;
+    font-size: 1.2em;
+    font-weight: bold;
+    padding: 0.6rem;
+    /* Use opacity pulse instead of scale pulse if jumping persists */
+    animation: godPulse 1.5s infinite ease-in-out;
   }
 }
 /* ---------- STATUS / BANNERS ---------- */
 
+/* 1. Fix the jumping by making status hover */
 #status {
+  position: absolute; /* Takes it out of the flex flow */
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;       /* Keeps it above the chat messages */
+  pointer-events: none; /* Allows clicks to pass through to the chat */
+  
   text-align: center;
   color: #ffcc00;
   font-size: 0.85em;
   padding: 0.3rem;
+  background: rgba(0,0,0,0.6); /* Optional: dark tint to keep text readable */
 }
 
 #newMessages {
