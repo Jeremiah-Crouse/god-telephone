@@ -10,9 +10,10 @@
   --bg: #000000;
   --input-bg: #111111;
   --accent: #ffffff;
+  --status-yellow: #ffcc00;
 }
 
-/* THE RESET: Force the body to be exactly the screen size */
+/* 1. RESET - Prevent the "Bounce" effect on mobile */
 html, body {
   margin: 0;
   padding: 0;
@@ -20,88 +21,103 @@ html, body {
   height: 100%;
   height: 100dvh;
   background: var(--bg);
-  font-family: Arial, sans-serif;
-  overflow: hidden; /* Prevents the whole page from bouncing */
-  position: fixed; /* Extra security for Android Chrome */
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  overflow: hidden; 
+  position: fixed;
 }
 
-/* THE GLOW ANIMATION */
+/* 2. ANIMATION - High-visibility Glow */
 @keyframes godPulse {
-  0% { opacity: 0.7; text-shadow: 0 0 5px #ffcc00; }
-  50% { opacity: 1; text-shadow: 0 0 20px #ffcc00, 0 0 30px #ffaa00; }
-  100% { opacity: 0.7; text-shadow: 0 0 5px #ffcc00; }
+  0% { opacity: 0.6; text-shadow: 0 0 5px var(--status-yellow); }
+  50% { opacity: 1; text-shadow: 0 0 20px var(--status-yellow), 0 0 35px #ffaa00; }
+  100% { opacity: 0.6; text-shadow: 0 0 5px var(--status-yellow); }
 }
 
-/* ---------- STATUS ---------- */
+/* 3. STATUS BAR - Floating Layer */
 #status {
-  position: absolute;
+  position: fixed;
   top: 0; left: 0; width: 100%;
   height: 60px;
   display: flex; align-items: center; justify-content: center;
-  z-index: 1000;
+  z-index: 10000;
   pointer-events: none;
-  color: #ffcc00;
-  font-size: 1.2em;
-  font-weight: bold;
+  color: var(--status-yellow);
+  font-size: 0.9em;
+  transition: background 0.4s ease;
 }
 
 #status.active {
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.85);
   animation: godPulse 1.5s infinite ease-in-out;
 }
 
-/* ---------- CHAT AREA ---------- */
+@media screen and (max-width: 600px) {
+  #status { font-size: 1.4em; font-weight: 900; height: 80px; }
+}
+
+/* 4. CHAT AREA - Dynamic Bottom Margin */
 #chat {
   position: absolute;
   top: 0;
-  bottom: 70px; /* This MUST match the height of your input bar */
   left: 0;
   right: 0;
+  /* Bottom is controlled by the inputBar height */
+  bottom: 80px; 
   overflow-y: auto;
-  padding: 1rem;
-  padding-top: 70px; /* Room for status */
+  padding: 1.2rem;
+  padding-top: 80px; 
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.8rem;
   -webkit-overflow-scrolling: touch;
 }
 
 .msg {
-  max-width: 80%;
-  padding: 0.7rem 1.1rem;
-  border-radius: 16px;
+  max-width: 85%;
+  padding: 0.8rem 1.2rem;
+  border-radius: 18px;
   word-wrap: break-word;
-  font-size: 16px; /* Optimized for mobile reading */
+  font-size: 16px;
+  line-height: 1.5;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
 
-/* ---------- INPUT BAR - FIXED TO GLASS ---------- */
+.system {
+  text-align: center;
+  color: #555;
+  font-size: 0.85em;
+  margin: 10px 0;
+}
+
+/* 5. INPUT BAR - THE "SURVIVOR" FIX */
 #inputBar {
-  position: absolute;
+  position: fixed;
+  /* We start at bottom 0, but JS will adjust this for the keyboard */
   bottom: 0;
   left: 0;
   right: 0;
-  height: 70px; /* Explicit height ensures it stays on screen */
+  height: 80px; 
   background: var(--input-bg);
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.7rem;
   padding: 0 1rem;
+  padding-bottom: env(safe-area-inset-bottom, 0);
   border-top: 1px solid #222;
-  box-sizing: border-box;
-  z-index: 1001;
+  z-index: 10001;
 }
 
 #input {
   flex: 1;
-  padding: 0.7rem;
-  font-size: 16px;
+  padding: 0.8rem;
+  font-size: 16px; /* Critical to prevent zoom */
   border-radius: 12px;
-  border: none;
-  background: #222;
+  border: 1px solid #333;
+  background: #1a1a1a;
   color: #fff;
   resize: none;
   outline: none;
-  height: 40px;
+  height: 45px;
   box-sizing: border-box;
 }
 
@@ -110,30 +126,36 @@ html, body {
   color: #000;
   border: none;
   border-radius: 12px;
-  height: 40px;
-  padding: 0 1.2rem;
-  font-weight: bold;
+  height: 45px;
+  padding: 0 1.3rem;
+  font-weight: 900;
+  cursor: pointer;
 }
 
 #changeName {
   background: none;
   color: #444;
   border: none;
-  font-size: 1.2rem;
+  font-size: 1.4rem;
+  padding: 0;
+  cursor: pointer;
 }
 
+/* 6. TOAST NOTIFICATION */
 #newMessages {
   display: none;
-  position: absolute;
-  bottom: 85px;
+  position: fixed;
+  bottom: 95px;
   left: 50%;
   transform: translateX(-50%);
-  background: #fff;
+  background: var(--accent);
   color: #000;
-  padding: 5px 15px;
-  border-radius: 20px;
-  font-size: 0.8em;
-  z-index: 1002;
+  padding: 8px 18px;
+  border-radius: 25px;
+  font-weight: bold;
+  font-size: 0.85em;
+  z-index: 10002;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
 }
 </style>
 </head>
@@ -144,27 +166,30 @@ html, body {
 <div id="chat"></div>
 
 <div id="inputBar">
-  <textarea id="input" rows="1" placeholder="Type…"></textarea>
-  <button id="send">Send</button>
+  <textarea id="input" rows="1" placeholder="Type message..."></textarea>
+  <button id="send">SEND</button>
   <button id="changeName">⚙</button>
 </div>
 
 <script>
+/* ---------- CORE STATE ---------- */
 let socket;
 const chat = document.getElementById("chat");
 const input = document.getElementById("input");
 const status = document.getElementById("status");
+const inputBar = document.getElementById("inputBar");
 const newMessages = document.getElementById("newMessages");
 
 let unseenCount = 0;
 let displayNameLocal = localStorage.getItem("godTelephoneName");
 
+/* ---------- COLOR LOGIC ---------- */
 const userColors = {};
-const colors = ["#00ffff","#ff00ff","#ffff00","#00ff00","#ff8800","#ff4444","#88ff88"];
+const colors = ["#00ffff","#ff00ff","#ffff00","#00ff00","#ff8800","#ff4444","#88ff88","#70a1ff","#ff4757"];
 
 function getColor(name) {
   if (name === "God") return { bg:"#ffffff", text:"#000000" };
-  if (name === displayNameLocal) return { bg:"#333", text:"#ffffff" };
+  if (name === displayNameLocal) return { bg:"#222222", text:"#ffffff" };
   if (!userColors[name]) {
     let hash = 0;
     for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
@@ -173,20 +198,50 @@ function getColor(name) {
   return { bg: userColors[name], text: "#000000" };
 }
 
+/* ---------- KEYBOARD & VIEWPORT FIX ---------- */
+// This is the "Magic" that keeps the input box visible on real phones
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', () => {
+    const vh = window.visualViewport.height;
+    const offset = window.innerHeight - vh;
+    // Push the input bar up exactly by how much the keyboard is taking up
+    inputBar.style.bottom = `${offset}px`;
+    // Also move the chat bottom so messages aren't hidden
+    chat.style.bottom = `${offset + 80}px`;
+    
+    if (offset > 0) {
+      setTimeout(() => chat.scrollTop = chat.scrollHeight, 100);
+    }
+  });
+}
+
+/* ---------- INITIALIZATION ---------- */
 if (!displayNameLocal) {
-    displayNameLocal = prompt("Enter your name:") || "User_" + Math.floor(Math.random() * 1000);
+    displayNameLocal = prompt("Enter your name:") || "Soul_" + Math.floor(Math.random() * 1000);
     localStorage.setItem("godTelephoneName", displayNameLocal.trim());
 }
 
 function connectSocket() {
-  socket = io("https://god-telephone.onrender.com", { transports: ["websocket"] });
-  socket.on("connect", () => socket.emit("join", { name: displayNameLocal }));
+  socket = io("https://god-telephone.onrender.com", { 
+    transports: ["websocket"],
+    reconnection: true
+  });
+
+  socket.on("connect", () => {
+    socket.emit("join", { name: displayNameLocal });
+  });
+
   socket.on("history", (msgs) => {
     chat.innerHTML = "";
     msgs.forEach(render);
     chat.scrollTop = chat.scrollHeight;
   });
+
   socket.on("message", render);
+  
+  socket.on("userJoined", ({name}) => appendSystem(`${name} entered`));
+  socket.on("userLeft", ({name}) => appendSystem(`${name} vanished`));
+
   socket.on("godListening", (listening) => {
     if (listening) {
       status.textContent = "God is listening…";
@@ -200,11 +255,13 @@ function connectSocket() {
 
 connectSocket();
 
+/* ---------- ACTIONS ---------- */
 function send() {
   const text = input.value.trim();
-  if (!text) return;
+  if (!text || !socket.connected) return;
   socket.emit("message", { text });
   input.value = "";
+  input.focus();
 }
 
 document.getElementById("send").onclick = send;
@@ -221,16 +278,43 @@ function render({ displayName, text, timestamp }) {
   const c = getColor(displayName);
   div.style.background = c.bg;
   div.style.color = c.text;
-  div.style.alignSelf = (displayName === "God") ? "center" : (displayName === displayNameLocal ? "flex-end" : "flex-start");
+  
+  // Alignment logic
+  if (displayName === "God") {
+    div.style.alignSelf = "center";
+    div.style.borderRadius = "2px";
+  } else if (displayName === displayNameLocal) {
+    div.style.alignSelf = "flex-end";
+    div.style.borderBottomRightRadius = "2px";
+  } else {
+    div.style.alignSelf = "flex-start";
+    div.style.borderBottomLeftRadius = "2px";
+  }
+
+  const time = new Date(timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
   div.textContent = `${displayName}: ${text}`;
   chat.appendChild(div);
-  
-  if (chat.scrollHeight - chat.scrollTop - chat.clientHeight < 200) {
+
+  // Scroll Management
+  const isNear = chat.scrollHeight - chat.scrollTop - chat.clientHeight < 250;
+  if (isNear) {
     chat.scrollTop = chat.scrollHeight;
+    newMessages.style.display = "none";
+    unseenCount = 0;
   } else {
     unseenCount++;
     newMessages.style.display = "block";
     newMessages.textContent = `↓ New messages (${unseenCount})`;
+  }
+}
+
+function appendSystem(text) {
+  const div = document.createElement("div");
+  div.className = "system";
+  div.textContent = text;
+  chat.appendChild(div);
+  if (chat.scrollHeight - chat.scrollTop - chat.clientHeight < 200) {
+    chat.scrollTop = chat.scrollHeight;
   }
 }
 
@@ -241,8 +325,11 @@ newMessages.onclick = () => {
 };
 
 document.getElementById("changeName").onclick = () => {
-  const n = prompt("New name:", displayNameLocal);
-  if (n) { localStorage.setItem("godTelephoneName", n); location.reload(); }
+  const n = prompt("Identity change:", displayNameLocal);
+  if (n) { 
+    localStorage.setItem("godTelephoneName", n.trim()); 
+    location.reload(); 
+  }
 };
 </script>
 </body>
