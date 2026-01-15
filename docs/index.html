@@ -22,7 +22,7 @@ body {
   flex-direction: column;
 }
 
-/* THE GLOW (No scaling, no jumping) */
+/* THE GLOW ANIMATION */
 @keyframes godPulse {
   0% { opacity: 0.7; text-shadow: 0 0 5px #ffcc00; }
   50% { opacity: 1; text-shadow: 0 0 20px #ffcc00, 0 0 30px #ffaa00; }
@@ -35,25 +35,34 @@ body {
   position: absolute; 
   top: 0;
   left: 0;
-  right: 0;
-  height: 50px; /* Fixed height is key */
+  width: 100%; /* Force full width for Android Chrome */
+  min-height: 0; 
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;       
+  z-index: 9999; /* Ensure it's on top of everything */
   pointer-events: none; 
   text-align: center;
   color: #ffcc00;
   font-size: 0.85em;
-  background: rgba(0,0,0,0.6);
+  /* Background removed from here to prevent the "ghost" bar */
+  transition: background 0.3s ease;
+}
+
+/* This class is added via JS only when God is actually listening */
+#status.active {
+  background: rgba(0,0,0,0.8);
+  padding: 10px 0;
 }
 
 @media screen and (max-width: 600px) {
   #status {
     font-size: 1.4em;
     font-weight: bold;
-    height: 70px;
+  }
+  #status.active {
     animation: godPulse 1.5s infinite ease-in-out;
+    padding: 20px 0;
   }
 }
 
@@ -74,15 +83,10 @@ body {
   flex: 1;
   overflow-y: auto;
   padding: 1rem;
-  /* Push chat down so it doesn't hide behind the absolute status */
-  padding-top: 60px; 
+  padding-top: 20px; 
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-}
-
-@media screen and (max-width: 600px) {
-  #chat { padding-top: 80px; }
 }
 
 .msg {
@@ -107,6 +111,7 @@ body {
   gap: 0.5rem;
   padding: 0.8rem;
   border-top: 1px solid #222;
+  z-index: 10;
 }
 
 #input {
@@ -153,38 +158,9 @@ const inputBar = document.getElementById("inputBar");
 const status = document.getElementById("status");
 const newMessages = document.getElementById("newMessages");
 
-let displayNameLocal = "";
-let unseenCount = 0;
-
-const userColors = {};
-const colors = ["#00ffff","#ff00ff","#ffff00","#00ff00","#ff8800"];
-
-function getColor(name) {
-  if (name === "God") return { bg:"#ffffff", text:"#000000" };
-  if (name === displayNameLocal) return { bg:"#333", text:"#ffffff" };
-  if (!userColors[name]) {
-    userColors[name] = colors[Object.keys(userColors).length % colors.length];
-  }
-  return { bg:userColors[name], text:"#000000" };
-}
-
-function isUserNearBottom() {
-  return chat.scrollHeight - chat.scrollTop - chat.clientHeight < 120;
-}
-
-function scrollToBottom() {
-  requestAnimationFrame(() => {
-    chat.scrollTop = chat.scrollHeight;
-  });
-}
-
-function maybeAutoScroll() {
-  if (isUserNearBottom()) scrollToBottom();
-}
-
-displayNameLocal = localStorage.getItem("godTelephoneName");
+let displayNameLocal = localStorage.getItem("godTelephoneName");
 if (!displayNameLocal) {
-    displayNameLocal = prompt("Enter your name:") || "Anonymous_" + Math.floor(Math.random() * 1000);
+    displayNameLocal = prompt("Enter your name:") || "Human_" + Math.floor(Math.random() * 1000);
     localStorage.setItem("godTelephoneName", displayNameLocal.trim());
 }
 
@@ -210,8 +186,15 @@ function connectSocket() {
   socket.on("userJoined", ({name}) => appendSystem(`${name} joined`));
   socket.on("userLeft", ({name}) => appendSystem(`${name} left`));
 
+  // FIX: Toggle the 'active' class to show/hide background and animation
   socket.on("godListening", listening => {
-    status.textContent = listening ? "God is listening…" : "";
+    if (listening) {
+      status.textContent = "God is listening…";
+      status.classList.add("active");
+    } else {
+      status.textContent = "";
+      status.classList.remove("active");
+    }
   });
 }
 
@@ -236,19 +219,28 @@ input.addEventListener("keydown", e => {
 function render({ displayName, text, timestamp }) {
   const div = document.createElement("div");
   div.className = "msg";
-  const c = getColor(displayName);
-  div.style.background = c.bg;
-  div.style.color = c.text;
+  
+  // Custom Color Logic
+  if (displayName === "God") {
+    div.style.background = "#ffffff";
+    div.style.color = "#000000";
+    div.style.alignSelf = "center";
+  } else if (displayName === displayNameLocal) {
+    div.style.background = "#333";
+    div.style.color = "#ffffff";
+    div.style.alignSelf = "flex-end";
+  } else {
+    div.style.background = "#555";
+    div.style.color = "#ffffff";
+    div.style.alignSelf = "flex-start";
+  }
 
-  if (displayName === "God") div.style.alignSelf = "center";
-  else if (displayName === displayNameLocal) div.style.alignSelf = "flex-end";
-  else div.style.alignSelf = "flex-start";
-
-  const time = new Date(timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
   div.textContent = `${displayName}: ${text}`;
-
   chat.appendChild(div);
-  maybeAutoScroll();
+  
+  if (chat.scrollHeight - chat.scrollTop - chat.clientHeight < 150) {
+    chat.scrollTop = chat.scrollHeight;
+  }
 }
 
 function appendSystem(text) {
@@ -256,7 +248,7 @@ function appendSystem(text) {
   div.className = "system";
   div.textContent = text;
   chat.appendChild(div);
-  maybeAutoScroll();
+  chat.scrollTop = chat.scrollHeight;
 }
 
 document.getElementById("changeName").onclick = () => {
