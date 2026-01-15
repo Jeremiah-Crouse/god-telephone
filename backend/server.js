@@ -3,9 +3,15 @@ import http from "http";
 import { Server } from "socket.io";
 import OpenAI from "openai";
 import cors from "cors";
-import dotenv from "dotenv";
+import { loadEnvFile } from "node:process";
 
-dotenv.config();
+// Native Node.js way to load .env without the 'dotenv' package
+try {
+  loadEnvFile(); 
+} catch (e) {
+  // If no .env file exists (like on Render production), it just skips this
+  console.log("No local .env file found; using system environment variables.");
+}
 
 const app = express();
 app.use(cors({ origin: "*" }));
@@ -19,7 +25,6 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 let history = [];
 let conversationSummary = "";
 let users = {};
-
 let pendingMessages = [];
 let llmCooldown = false;
 let unseenMessageCount = 0;
@@ -28,7 +33,7 @@ const MAX_RAW_MESSAGES = 20;
 const SUMMARIZE_AFTER = 30;
 const LLM_INTERVAL_MS = 20_000;
 
-// Every request starts at the top and tries to work its way down if blocked
+// Priority list: Always starts at the top for every request
 const MODEL_PRIORITY_LIST = [
   "gpt-4.1-mini",
   "gpt-4.1-mini-2025-04-14",
@@ -45,10 +50,6 @@ Do not preface your message with "God:" or similar.
 
 /* ---------------- HELPERS ---------------- */
 
-/**
- * Optimized Fallback Logic:
- * Tries the best models first for every single call.
- */
 async function chatWithFallback(payload, taskName = "Completion") {
   for (const modelId of MODEL_PRIORITY_LIST) {
     try {
@@ -63,26 +64,19 @@ async function chatWithFallback(payload, taskName = "Completion") {
       return response;
 
     } catch (err) {
-      // 429 = Rate Limit or Quota. If we hit this, we try the next model immediately.
-      if (err.status === 429 || err.message.includes("quota")) {
-        console.warn(`[FALLBACK] ${modelId} reached limit. trying next in list...`);
+      if (err.status === 429 || err.message.toLowerCase().includes("quota")) {
+        console.warn(`[FALLBACK] ${modelId} busy/capped. Trying next...`);
         continue;
       }
-      // Log other serious errors (auth, syntax, etc)
       console.error(`[CRITICAL ERROR] ${modelId} failed:`, err.message);
       throw err; 
     }
   }
-  throw new Error("All models currently exhausted for this window.");
+  throw new Error("All models currently exhausted.");
 }
 
 async function summarizeHistory(messages) {
-  const summaryPrompt = `
-Summarize the following conversation. Preserve key ideas, names, and themes.
-Conversation:
-${messages.map(m => `${m.displayName}: ${m.text}`).join("\n")}
-`;
-
+  const summaryPrompt = `Summarize conversation. Preserve themes:\n${messages.map(m => `${m.displayName}: ${m.text}`).join("\n")}`;
   const result = await chatWithFallback({
     messages: [
       { role: "system", content: "You summarize conversations." },
@@ -90,13 +84,11 @@ ${messages.map(m => `${m.displayName}: ${m.text}`).join("\n")}
     ],
     temperature: 0.3
   }, "Summarization");
-
   return result.choices[0].message.content.trim();
 }
 
 async function processLLMQueue() {
   if (llmCooldown || pendingMessages.length === 0) return;
-
   llmCooldown = true;
   io.emit("godListening", true);
 
@@ -109,7 +101,7 @@ async function processLLMQueue() {
     const completion = await chatWithFallback({
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
-        ...(conversationSummary ? [{ role: "system", content: `History Summary: ${conversationSummary}` }] : []),
+        ...(conversationSummary ? [{ role: "system", content: `History: ${conversationSummary}` }] : []),
         ...history.map(m => ({ role: "user", content: `${m.displayName}: ${m.text}` })),
         { role: "user", content: "Respond to:\n" + batch.map(m => `${m.displayName}: ${m.text}`).join("\n") }
       ],
@@ -117,13 +109,11 @@ async function processLLMQueue() {
     }, "God Response");
 
     let reply = completion.choices[0].message.content.trim().replace(/^God:\s*/i, "");
-
     const llmMsg = { userID: "llm", displayName: "God", text: reply, timestamp: Date.now() };
     history.push(llmMsg);
     io.emit("message", llmMsg);
-
   } catch (err) {
-    console.error("LLM Queue Processing Failed:", err.message);
+    console.error("Queue Processing Failed:", err.message);
   }
 
   setTimeout(() => {
@@ -133,23 +123,8 @@ async function processLLMQueue() {
   }, LLM_INTERVAL_MS);
 }
 
-/* ---------------- HEARTBEAT ---------------- */
-setInterval(() => {
-  const now = Date.now();
-  for (const [id, user] of Object.entries(users)) {
-    if (now - user.lastActive > 1000 * 60 * 30) {
-      delete users[id];
-      io.emit("userLeft", { name: user.name });
-    }
-  }
-}, 60 * 1000);
-
-app.get("/heartbeat", (_, res) => res.send("OK"));
-
 /* ---------------- SOCKET.IO ---------------- */
 io.on("connection", (socket) => {
-  console.log(`User connected: ${socket.id}`);
-
   socket.on("join", ({ name }) => {
     users[socket.id] = { name, lastActive: Date.now() };
     socket.emit("history", history);
@@ -162,7 +137,6 @@ io.on("connection", (socket) => {
     const user = users[socket.id];
     if (!user) return;
     user.lastActive = Date.now();
-
     const msg = { userID: socket.id, displayName: user.name, text, timestamp: Date.now() };
     history.push(msg);
     io.emit("message", msg);
@@ -178,7 +152,6 @@ io.on("connection", (socket) => {
         history = history.slice(-MAX_RAW_MESSAGES);
       } catch (e) { console.error("Summary error:", e); }
     }
-
     pendingMessages.push(msg);
     processLLMQueue();
   });
@@ -193,8 +166,5 @@ io.on("connection", (socket) => {
 });
 
 server.listen(process.env.PORT || 3000, () => {
-  console.log("------------------------------------------");
-  console.log("God-Telephone Server Active on Port 3000");
-  console.log("Monitoring Model Fallbacks in Real-Time...");
-  console.log("------------------------------------------");
+  console.log("God-Telephone Server Active (Native Env Mode)");
 });
