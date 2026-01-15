@@ -21,7 +21,43 @@ body {
   display: flex;
   flex-direction: column;
 }
+/* 1. Define the pulsing glow animation */
+@keyframes godPulse {
+  0% {
+    transform: scale(1);
+    text-shadow: 0 0 5px #ffcc00, 0 0 10px #ffcc00;
+  }
+  50% {
+    transform: scale(1.1);
+    text-shadow: 0 0 15px #ffcc00, 0 0 30px #ffaa00, 0 0 40px #ffaa00;
+  }
+  100% {
+    transform: scale(1);
+    text-shadow: 0 0 5px #ffcc00, 0 0 10px #ffcc00;
+  }
+}
 
+/* 2. Apply it to the status banner */
+#status {
+  text-align: center;
+  color: #ffcc00;
+  font-size: 0.85em;
+  padding: 0.3rem;
+  transition: all 0.3s ease;
+}
+
+/* 3. Mobile-specific overrides with the animation */
+@media screen and (max-width: 600px) {
+  #status {
+    font-size: 1.5em; /* Extra large for mobile */
+    font-weight: 900;
+    padding: 0.8rem;
+    /* This makes it pulse only when God is active */
+    animation: godPulse 1.5s infinite ease-in-out; 
+    display: block;
+    width: 100%;
+  }
+}
 /* ---------- STATUS / BANNERS ---------- */
 
 #status {
