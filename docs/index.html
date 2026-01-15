@@ -21,58 +21,54 @@ body {
   display: flex;
   flex-direction: column;
 }
-/* 3. Modify the Keyframes to use Opacity + Glow (Zero jumping) */
-@keyframes godPulse {
-  0% {
-    opacity: 0.7;
-    text-shadow: 0 0 5px #ffcc00;
-  }
-  50% {
-    opacity: 1;
-    text-shadow: 0 0 20px #ffcc00, 0 0 30px #ffaa00;
-  }
-  100% {
-    opacity: 0.7;
-    text-shadow: 0 0 5px #ffcc00;
-  }
-}
 
-/* 2. Update the mobile animation to avoid physical layout shifts */
-@media screen and (max-width: 600px) {
-  #status {
-    font-size: 1.2em;
-    font-weight: bold;
-    padding: 0.6rem;
-    /* Use opacity pulse instead of scale pulse if jumping persists */
-    animation: godPulse 1.5s infinite ease-in-out;
-  }
-}
 /* ---------- STATUS / BANNERS ---------- */
 
-/* 1. Fix the jumping by making status hover */
+/* Fixed height and absolute positioning prevents layout jumping */
 #status {
-  position: absolute; /* Takes it out of the flex flow */
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  z-index: 100;       /* Keeps it above the chat messages */
-  pointer-events: none; /* Allows clicks to pass through to the chat */
-  
-  text-align: center;
+  height: 40px; 
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  pointer-events: none; /* Clicks pass through to chat */
   color: #ffcc00;
   font-size: 0.85em;
-  padding: 0.3rem;
-  background: rgba(0,0,0,0.6); /* Optional: dark tint to keep text readable */
+  background: rgba(0, 0, 0, 0.4);
+}
+
+@keyframes godPulse {
+  0% { opacity: 0.6; text-shadow: 0 0 5px #ffcc00; }
+  50% { opacity: 1; text-shadow: 0 0 20px #ffcc00, 0 0 30px #ffaa00; }
+  100% { opacity: 0.6; text-shadow: 0 0 5px #ffcc00; }
+}
+
+@media screen and (max-width: 600px) {
+  #status {
+    font-size: 1.4em;
+    font-weight: 900;
+    height: 60px; /* Slightly taller for mobile tap safety */
+    animation: godPulse 1.5s infinite ease-in-out;
+  }
 }
 
 #newMessages {
   display: none;
-  text-align: center;
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
   background: #ffffff;
   color: #000000;
   font-size: 0.85em;
-  padding: 0.3rem;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
   cursor: pointer;
+  z-index: 999;
 }
 
 /* ---------- CHAT ---------- */
@@ -81,191 +77,156 @@ body {
   flex: 1;
   overflow-y: auto;
   padding: 1rem;
-  padding-bottom: 6rem; /* extra safety */
+  padding-top: 50px; /* Space so messages don't start under the status */
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
+@media screen and (max-width: 600px) {
+  #chat { padding-top: 70px; }
+}
+
 .msg {
-  max-width: 75%;
   padding: 0.6rem 1rem;
-  border-radius: 14px;
+  border-radius: 1rem;
+  max-width: 80%;
   word-wrap: break-word;
+  font-size: 0.95em;
   line-height: 1.4;
 }
 
 .system {
+  font-size: 0.8em;
+  color: #666;
   text-align: center;
-  color: #888;
-  font-size: 0.85em;
+  margin: 0.5rem 0;
 }
 
-/* ---------- INPUT ---------- */
+/* ---------- INPUT AREA ---------- */
 
-#inputBar {
-  position: sticky;
-  bottom: 0;
+#inputArea {
+  padding: 1rem;
   background: var(--input-bg);
   display: flex;
   gap: 0.5rem;
-  padding: 0.5rem;
 }
 
-#input {
+input {
   flex: 1;
-  padding: 0.6rem 1rem;
-  font-size: 1rem;
-  border-radius: 14px;
-  border: none;
-  resize: none;
   background: #222;
-  color: #ffffff;
-  overflow-y: auto;
+  border: 1px solid #333;
+  color: #fff;
+  padding: 0.8rem;
+  border-radius: 0.5rem;
+  outline: none;
 }
 
-#send {
+button {
   background: var(--accent);
-  color: #000000;
+  color: #000;
   border: none;
-  border-radius: 14px;
-  padding: 0.6rem 1rem;
-  font-size: 1rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: bold;
   cursor: pointer;
 }
 
-#input:focus,
-#send:focus {
-  outline: none;
+#changeName {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(255,255,255,0.1);
+  color: #aaa;
+  font-size: 0.7em;
+  padding: 4px 8px;
+  border-radius: 4px;
+  z-index: 1001;
 }
+
 </style>
 </head>
-
 <body>
 
 <div id="status"></div>
-<div id="newMessages"></div>
+<div id="newMessages">↓ New messages</div>
+<div id="changeName">Change Name</div>
+
 <div id="chat"></div>
 
-<div id="inputBar" style="display:none;">
-  <textarea id="input" rows="2" placeholder="Type…"></textarea>
+<div id="inputArea">
+  <input id="input" placeholder="Type a message..." autocomplete="off">
   <button id="send">Send</button>
-  <button id="changeName" style="background:none; color:#888; border:none; cursor:pointer; font-size:0.7rem;">⚙</button>
 </div>
 
 <script>
-let socket;
+let socket = io();
+let displayNameLocal = localStorage.getItem("godName") || "Human";
+let unseenCount = 0;
+
 const chat = document.getElementById("chat");
 const input = document.getElementById("input");
-const inputBar = document.getElementById("inputBar");
 const status = document.getElementById("status");
 const newMessages = document.getElementById("newMessages");
 
-let displayNameLocal = "";
-let unseenCount = 0;
-
-const userColors = {};
-const colors = ["#00ffff","#ff00ff","#ffff00","#00ff00","#ff8800"];
-
-function getColor(name) {
-  if (name === "God") return { bg:"#ffffff", text:"#000000" };
-  if (name === displayNameLocal) return { bg:"#000000", text:"#ffffff" };
-  if (!userColors[name]) {
-    userColors[name] = colors[Object.keys(userColors).length % colors.length];
-  }
-  return { bg:userColors[name], text:"#000000" };
-}
-
-/* ---------- SCROLL LOGIC ---------- */
-
-function isUserNearBottom() {
-  return chat.scrollHeight - chat.scrollTop - chat.clientHeight < 120;
-}
+/* ---------- HELPERS ---------- */
 
 function scrollToBottom() {
-  requestAnimationFrame(() => {
-    chat.scrollTop = chat.scrollHeight;
-  });
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function isUserNearBottom() {
+  const threshold = 150;
+  return chat.scrollHeight - chat.scrollTop - chat.clientHeight < threshold;
 }
 
 function maybeAutoScroll() {
-  if (isUserNearBottom()) {
-    scrollToBottom();
-  }
+  if (isUserNearBottom()) scrollToBottom();
 }
 
-chat.addEventListener("scroll", () => {
-  if (isUserNearBottom()) {
-    unseenCount = 0;
-    newMessages.style.display = "none";
+function getColor(name) {
+  if (name === "God") return { bg: "#333", text: "#ffcc00" };
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
+  const h = Math.abs(hash) % 360;
+  return { bg: `hsl(${h}, 30%, 20%)`, text: "#fff" };
+}
+
+/* ---------- LOGIC ---------- */
+
+socket.emit("join", { name: displayNameLocal });
+
+socket.on("history", (history) => {
+  chat.innerHTML = "";
+  history.forEach(render);
+  scrollToBottom();
 });
 
-/* ---------- NAME ---------- */
-displayNameLocal = localStorage.getItem("godTelephoneName");
+socket.on("message", (msg) => {
+  render(msg);
+});
 
-if (!displayNameLocal) {
-    displayNameLocal = prompt("Enter your name:");
-    if (!displayNameLocal || displayNameLocal.trim() === "") {
-        displayNameLocal = "Anonymous_" + Math.floor(Math.random() * 1000);
-    }
-    localStorage.setItem("godTelephoneName", displayNameLocal.trim());
-}
+socket.on("userJoined", (u) => appendSystem(`${u.name} joined.`));
+socket.on("userLeft", (u) => appendSystem(`${u.name} left.`));
 
-inputBar.style.display = "flex";
-input.focus();
+socket.on("godListening", (isListening) => {
+  status.textContent = isListening ? "God is listening..." : "";
+});
 
-/* ---------- SOCKET ---------- */
-
-function connectSocket() {
-  socket = io("https://god-telephone.onrender.com", {
-    transports: ["websocket"],
-    reconnection: true,
-    reconnectionAttempts: Infinity
-  });
-
-  socket.on("connect", () => {
-    status.textContent = "";
-    socket.emit("join", { name: displayNameLocal });
-  });
-
-  socket.on("disconnect", () => {
-    status.textContent = "Disconnected. Reconnecting…";
-  });
-
-  socket.on("history", msgs => msgs.forEach(render));
-  socket.on("message", render);
-
-  socket.on("userJoined", ({name}) => appendSystem(`${name} joined`));
-  socket.on("userLeft", ({name}) => appendSystem(`${name} left`));
-
-  socket.on("godListening", listening => {
-    status.textContent = listening ? "God is listening…" : "";
-  });
-
-  socket.on("newMessagesPending", count => {
-    if (!isUserNearBottom() && count > 0) {
-      unseenCount = count;
-      newMessages.textContent = `↓ New messages (${count})`;
-      newMessages.style.display = "block";
-    }
-  });
-}
-
-connectSocket();
-
-/* ---------- SEND ---------- */
+socket.on("newMessagesPending", (count) => {
+  // Optional: show user how many messages God hasn't seen yet
+});
 
 function send() {
   const text = input.value.trim();
-  if (!text || !socket.connected) return;
+  if (!text) return;
   socket.emit("message", { text });
   input.value = "";
-  input.focus();
 }
 
 document.getElementById("send").onclick = send;
-
 input.addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
@@ -284,7 +245,6 @@ newMessages.onclick = () => {
 function render({ displayName, text, timestamp }) {
   const div = document.createElement("div");
   div.className = "msg";
-
   const c = getColor(displayName);
   div.style.background = c.bg;
   div.style.color = c.text;
@@ -293,7 +253,7 @@ function render({ displayName, text, timestamp }) {
   else if (displayName === displayNameLocal) div.style.alignSelf = "flex-end";
   else div.style.alignSelf = "flex-start";
 
-  const time = new Date(timestamp).toLocaleTimeString();
+  const time = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   div.textContent = `${displayName} [${time}]: ${text}`;
 
   chat.appendChild(div);
@@ -303,7 +263,6 @@ function render({ displayName, text, timestamp }) {
     newMessages.textContent = `↓ New messages (${unseenCount})`;
     newMessages.style.display = "block";
   }
-
   maybeAutoScroll();
 }
 
@@ -316,12 +275,13 @@ function appendSystem(text) {
 }
 
 document.getElementById("changeName").onclick = () => {
-  if (confirm("Would you like to change your display name?")) {
-    localStorage.removeItem("godTelephoneName");
-    location.reload(); // Refresh to trigger the name prompt logic
+  const n = prompt("Enter new name:", displayNameLocal);
+  if (n) {
+    displayNameLocal = n;
+    localStorage.setItem("godName", n);
+    window.location.reload();
   }
 };
-
 </script>
 
 </body>
