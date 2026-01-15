@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover">
 <title>God Telephone</title>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 
@@ -12,11 +12,11 @@
   --accent: #ffffff;
 }
 
+/* THE FIX: Use dvh (Dynamic Viewport Height) to account for mobile bars */
 body {
   margin: 0;
-  height: 100vh;
-  /* Support for modern mobile browser height quirks */
-  height: -webkit-fill-available; 
+  height: 100vh; 
+  height: 100dvh; 
   overflow: hidden;
   background: var(--bg);
   font-family: Arial, sans-serif;
@@ -24,26 +24,20 @@ body {
   flex-direction: column;
 }
 
-/* 1. ANIMATION - Glow only to prevent physical layout jitter */
 @keyframes godPulse {
   0% { opacity: 0.7; text-shadow: 0 0 5px #ffcc00; }
   50% { opacity: 1; text-shadow: 0 0 20px #ffcc00, 0 0 30px #ffaa00; }
   100% { opacity: 0.7; text-shadow: 0 0 5px #ffcc00; }
 }
 
-/* 2. STATUS BANNER - Fixed so it doesn't push the chat window down */
+/* ---------- STATUS BANNER ---------- */
 #status {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
+  top: 0; left: 0; width: 100%;
   height: 50px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: flex; align-items: center; justify-content: center;
   z-index: 10000;
   pointer-events: none;
-  text-align: center;
   color: #ffcc00;
   font-size: 0.85em;
   background: transparent;
@@ -59,11 +53,11 @@ body {
   #status { font-size: 1.3em; font-weight: bold; height: 70px; }
 }
 
-/* 3. NEW MESSAGES TOAST */
+/* ---------- NEW MESSAGES TOAST ---------- */
 #newMessages {
   display: none;
   position: fixed;
-  bottom: 100px;
+  bottom: 120px; /* Raised so it doesn't block the input */
   left: 50%;
   transform: translateX(-50%);
   background: #ffffff;
@@ -73,16 +67,16 @@ body {
   border-radius: 20px;
   cursor: pointer;
   z-index: 999;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.5);
 }
 
-/* 4. CHAT AREA - Anchored with padding for the top and bottom fixed bars */
+/* ---------- CHAT AREA ---------- */
 #chat {
   flex: 1;
   overflow-y: auto;
   padding: 1rem;
-  padding-top: 60px;   /* Room for God is Listening */
-  padding-bottom: 90px; /* Room for Input Bar */
+  /* Ensure padding matches the fixed top/bottom bars */
+  padding-top: 60px;   
+  padding-bottom: 100px; 
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
@@ -109,17 +103,18 @@ body {
   margin: 0.4rem 0;
 }
 
-/* 5. INPUT BAR - Fixed to bottom to ensure it survives mobile keyboards */
+/* ---------- INPUT BAR - THE CRITICAL BOTTOM FIX ---------- */
 #inputBar {
   position: fixed;
-  bottom: 0;
+  /* Use env(safe-area-inset-bottom) to handle iPhone notches/Android bars */
+  bottom: env(safe-area-inset-bottom, 0); 
   left: 0;
   right: 0;
   background: var(--input-bg);
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  padding: 0.8rem 1rem;
+  padding: 1rem;
   border-top: 1px solid #222;
   z-index: 9999;
 }
@@ -127,7 +122,7 @@ body {
 #input {
   flex: 1;
   padding: 0.7rem 1rem;
-  font-size: 16px; /* 16px prevents mobile auto-zoom */
+  font-size: 16px; 
   border-radius: 14px;
   border: none;
   background: #222;
@@ -144,16 +139,13 @@ body {
   border-radius: 14px;
   padding: 0.7rem 1.2rem;
   font-weight: bold;
-  cursor: pointer;
 }
 
 #changeName {
   background: none;
   color: #555;
   border: none;
-  cursor: pointer;
   font-size: 1.2rem;
-  padding: 0;
 }
 </style>
 </head>
@@ -162,13 +154,12 @@ body {
 
 <div id="status"></div>
 <div id="newMessages">↓ New messages</div>
-
 <div id="chat"></div>
 
 <div id="inputBar">
   <textarea id="input" rows="1" placeholder="Type a message..."></textarea>
   <button id="send">Send</button>
-  <button id="changeName" title="Change Name">⚙</button>
+  <button id="changeName">⚙</button>
 </div>
 
 <script>
@@ -182,7 +173,6 @@ const changeNameBtn = document.getElementById("changeName");
 let unseenCount = 0;
 let displayNameLocal = localStorage.getItem("godTelephoneName");
 
-// Restored Color Hashing Logic
 const userColors = {};
 const colors = ["#00ffff","#ff00ff","#ffff00","#00ff00","#ff8800","#ff4444","#88ff88"];
 
@@ -190,15 +180,12 @@ function getColor(name) {
   if (name === "God") return { bg:"#ffffff", text:"#000000" };
   if (name === displayNameLocal) return { bg:"#333", text:"#ffffff" };
   if (!userColors[name]) {
-    // Basic hash to keep colors consistent for names
     let hash = 0;
     for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
     userColors[name] = colors[Math.abs(hash) % colors.length];
   }
   return { bg: userColors[name], text: "#000000" };
 }
-
-/* ---------- SCROLL & VIEWPORT ---------- */
 
 function isUserNearBottom() {
   return chat.scrollHeight - chat.scrollTop - chat.clientHeight < 150;
@@ -210,13 +197,10 @@ function scrollToBottom() {
   });
 }
 
-// Ensure the name prompt works before anything else
 if (!displayNameLocal) {
     displayNameLocal = prompt("Enter your name:") || "Human_" + Math.floor(Math.random() * 1000);
     localStorage.setItem("godTelephoneName", displayNameLocal.trim());
 }
-
-/* ---------- SOCKET LOGIC ---------- */
 
 function connectSocket() {
   socket = io("https://god-telephone.onrender.com", {
@@ -224,10 +208,7 @@ function connectSocket() {
     reconnection: true
   });
 
-  socket.on("connect", () => {
-    socket.emit("join", { name: displayNameLocal });
-  });
-
+  socket.on("connect", () => socket.emit("join", { name: displayNameLocal }));
   socket.on("history", (msgs) => {
     chat.innerHTML = "";
     msgs.forEach(render);
@@ -247,15 +228,9 @@ function connectSocket() {
       status.classList.remove("active");
     }
   });
-
-  socket.on("newMessagesPending", (count) => {
-    // This allows the server to notify how many messages God is currently "reading"
-  });
 }
 
 connectSocket();
-
-/* ---------- SENDING ---------- */
 
 function send() {
   const text = input.value.trim();
@@ -266,7 +241,6 @@ function send() {
 }
 
 document.getElementById("send").onclick = send;
-
 input.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
@@ -280,33 +254,25 @@ newMessages.onclick = () => {
   newMessages.style.display = "none";
 };
 
-/* ---------- RENDERING ---------- */
-
 function render({ displayName, text, timestamp }) {
   const div = document.createElement("div");
   div.className = "msg";
-
   const c = getColor(displayName);
   div.style.background = c.bg;
   div.style.color = c.text;
 
-  // Alignment
   if (displayName === "God") div.style.alignSelf = "center";
   else if (displayName === displayNameLocal) div.style.alignSelf = "flex-end";
   else div.style.alignSelf = "flex-start";
 
-  const time = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   div.textContent = `${displayName}: ${text}`;
-
   chat.appendChild(div);
 
-  // Manage "New Messages" toast
-  if (!isUserNearBottom()) {
+  if (isUserNearBottom()) scrollToBottom();
+  else {
     unseenCount++;
     newMessages.textContent = `↓ New messages (${unseenCount})`;
     newMessages.style.display = "block";
-  } else {
-    scrollToBottom();
   }
 }
 
@@ -319,13 +285,12 @@ function appendSystem(text) {
 }
 
 changeNameBtn.onclick = () => {
-  const newName = prompt("Change your display name:", displayNameLocal);
-  if (newName && newName.trim() !== "") {
+  const newName = prompt("Change name:", displayNameLocal);
+  if (newName) {
     localStorage.setItem("godTelephoneName", newName.trim());
     location.reload();
   }
 };
 </script>
-
 </body>
 </html>
