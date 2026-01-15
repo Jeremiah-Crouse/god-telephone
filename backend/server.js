@@ -31,7 +31,7 @@ let unseenMessageCount = 0;
 
 const MAX_RAW_MESSAGES = 20;
 const SUMMARIZE_AFTER = 30;
-const LLM_INTERVAL_MS = 20_000;
+const LLM_INTERVAL_MS = 22_000;
 
 // Every request starts at the top and tries to work its way down if blocked
 const MODEL_PRIORITY_LIST = [
