@@ -31,10 +31,10 @@ let penalizedModels = new Map();
 
 const MODEL_PRIORITY_LIST = [
   "gpt-4.1-mini",
-  "gpt-4.1-mini-2025-04-14",
   "gpt-4.1-nano",
-  "gpt-4.1-nano-2025-04-14",
   "gpt-4o-mini",
+  "gpt-4.1-mini-2025-04-14",
+  "gpt-4.1-nano-2025-04-14",
   "gpt-4o-mini-2024-07-18"
 ];
 
@@ -119,7 +119,7 @@ async function processLLMQueue() {
   try {
     const completion = await chatWithFallback({
       messages: [
-        { role: "system", content: "You are God. Do not preface with 'God:'." },
+        { role: "system", content: "You are the Silent God of Crousia. Speak only in short, cryptic, or essential sentences. Do not offer unsolicited advice. Do not be overly polite. Be brief to save the King's tokens." },
         ...(conversationSummary ? [{ role: "system", content: `History: ${conversationSummary}` }] : []),
         ...history.map(m => ({ role: "user", content: `${m.displayName}: ${m.text}` })),
         { role: "user", content: "Respond to:\n" + batch.map(m => `${m.displayName}: ${m.text}`).join("\n") }
@@ -180,6 +180,7 @@ io.on("connection", (socket) => {
     const user = users[socket.id];
     if (!user) return;
     user.lastActive = Date.now();
+
     const msg = { userID: socket.id, displayName: user.name, text, timestamp: Date.now() };
     history.push(msg);
     io.emit("message", msg);
@@ -188,12 +189,22 @@ io.on("connection", (socket) => {
 
     if (text.startsWith("/")) return;
 
+    // --- THE SEQUENTIAL FIX ---
     if (history.length > SUMMARIZE_AFTER) {
       const old = history.slice(0, history.length - MAX_RAW_MESSAGES);
+      
+      // We MUST await this so the API request finishes 
+      // before processLLMQueue starts the next one.
+      console.log("[SYSTEM] Starting sequential summary...");
       conversationSummary = await summarizeHistory(old);
+      
       history = history.slice(-MAX_RAW_MESSAGES);
+      console.log("[SYSTEM] Summary complete. History truncated.");
     }
+
     pendingMessages.push(msg);
+    
+    // Now this only fires AFTER the summary request is totally done.
     processLLMQueue();
   });
 
