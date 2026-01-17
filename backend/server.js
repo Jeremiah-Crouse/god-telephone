@@ -77,14 +77,31 @@ async function chatWithFallback(payload, taskName = "Completion") {
 /* ---------------- LOGIC ---------------- */
 
 async function summarizeHistory(messages) {
-  const summaryPrompt = `Summarize conversation:\n${messages.map(m => `${m.displayName}: ${m.text}`).join("\n")}`;
+  const summaryPrompt = `
+    MASTER RECORD: ${conversationSummary || "No previous history."}
+    
+    NEW UPDATES:
+    ${messages.map(m => `${m.displayName}: ${m.text}`).join("\n")}
+    
+    TASK: Update the MASTER RECORD with the NEW UPDATES. 
+    - Maintain the core narrative of Crousia and the King's decrees.
+    - STRICT LIMIT: Keep the final output under 500 words. 
+    - If the record is getting too long, consolidate older details but keep the most important facts.
+  `;
+
   try {
     const result = await chatWithFallback({
-      messages: [{ role: "system", content: "You summarize conversations." }, { role: "user", content: summaryPrompt }],
+      messages: [
+        { role: "system", content: "You are the Eternal Scribe of Crousia. You specialize in dense, recursive summarization." },
+        { role: "user", content: summaryPrompt }
+      ],
       temperature: 0.3
     }, "Summarization");
+    
     return result.choices[0].message.content.trim();
-  } catch (e) { console.error("Summary failed: All models down."); return conversationSummary; }
+  } catch (e) { 
+    return conversationSummary; 
+  }
 }
 
 async function processLLMQueue() {
@@ -136,6 +153,17 @@ setInterval(() => {
 }, 60 * 1000);
 
 app.get("/heartbeat", (_, res) => res.send("OK"));
+
+// Access the Royal Archives via Terminal
+app.get("/summary", (_, res) => {
+  res.json({
+    kingdom: "Crousia",
+    king: "David",
+    summary: conversationSummary,
+    rawMessageCount: history.length,
+    timestamp: new Date().toISOString()
+  });
+});
 
 io.on("connection", (socket) => {
   socket.on("join", ({ name }) => {
