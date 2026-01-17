@@ -44,34 +44,36 @@ async function chatWithFallback(payload, taskName = "Completion") {
   const now = Date.now();
 
   for (const modelId of MODEL_PRIORITY_LIST) {
-    // Check if model is in the penalty box
     if (penalizedModels.has(modelId)) {
-      const unlockTime = penalizedModels.get(modelId);
-      if (now < unlockTime) {
-        // Still penalized, skip silently and instantly
-        continue;
-      } else {
-        // Penalty expired, clean it up
-        penalizedModels.delete(modelId);
-      }
+      if (now < penalizedModels.get(modelId)) continue;
+      penalizedModels.delete(modelId);
     }
 
     try {
       console.log(`[${new Date().toISOString()}] Attempting ${taskName} with: ${modelId}`);
-      const response = await openai.chat.completions.create({ ...payload, model: modelId });
-      console.log(`[SUCCESS] ${taskName} using ${modelId}`);
-      return response;
+      return await openai.chat.completions.create({ ...payload, model: modelId });
 
     } catch (err) {
-      if (err.status === 429 || err.message.toLowerCase().includes("quota")) {
-        console.warn(`[PENALIZING] ${modelId} failed. Putting in 1-hour timeout.`);
-        penalizedModels.set(modelId, Date.now() + PENALTY_DURATION_MS);
-        continue; // Immediately try the next non-penalized model
+      const errMsg = err.message.toLowerCase();
+      const isQuota = err.status === 429 || errMsg.includes("quota") || errMsg.includes("rate limit");
+      const isNotFound = err.status === 404 || err.status === 400 || errMsg.includes("not found");
+
+      if (isQuota) {
+        console.warn(`[PENALIZING] ${modelId} - Limit reached. 1-hour timeout.`);
+        penalizedModels.set(modelId, now + PENALTY_DURATION_MS);
+        continue; 
       }
+
+      if (isNotFound) {
+        console.warn(`[SKIPPING] ${modelId} - Model unavailable or invalid name.`);
+        continue; // Keep looking for a working model!
+      }
+
+      // If it's something truly weird (like a bad API key), stop everything.
       throw err; 
     }
   }
-  throw new Error("All models are currently in the penalty box.");
+  throw new Error("The Heavens are silent. All models failed or are penalized.");
 }
 
 /* ---------------- LOGIC ---------------- */
