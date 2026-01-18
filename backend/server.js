@@ -32,8 +32,15 @@ const LLM_INTERVAL_MS = 20_000;
 const PENALTY_DURATION_MS = 60 * 60 * 1000;
 
 let penalizedModels = new Map();
-const MODEL_PRIORITY_LIST = ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo"];
-
+// RESTORED: The working experimental priority list
+const MODEL_PRIORITY_LIST = [
+  "gpt-4.1-mini",
+  "gpt-4.1-nano",
+  "gpt-4o-mini",
+  "gpt-4.1-mini-2025-04-14",
+  "gpt-4.1-nano-2025-04-14",
+  "gpt-4o-mini-2024-07-18"
+];
 /* ---------------- THE SCRIBE (Gemini) ---------------- */
 
 async function summarizeHistory(messages) {
