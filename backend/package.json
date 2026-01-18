@@ -1,13 +1,15 @@
 {
   "name": "god-telephone-backend",
-  "version": "1.0.0",
-  "description": "Three-way conversation server with GodLLM",
+  "version": "1.1.0",
+  "description": "Crousian Dual-Engine Server: God (OpenAI) & Scribe (Gemini)",
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "node --watch server.js"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.21.0",
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "openai": "^4.30.0",

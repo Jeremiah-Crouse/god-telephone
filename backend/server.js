@@ -2,6 +2,7 @@ import express from "express";
 import http from "http";
 import { Server } from "socket.io";
 import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import cors from "cors";
 import { loadEnvFile } from "node:process";
 
@@ -11,7 +12,11 @@ const app = express();
 app.use(cors({ origin: "*" }));
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
+
+// --- INITIALIZE ENGINES ---
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const scribeModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 /* ---------------- STATE ---------------- */
 let history = [];
@@ -24,86 +29,57 @@ let unseenMessageCount = 0;
 const MAX_RAW_MESSAGES = 20;
 const SUMMARIZE_AFTER = 30;
 const LLM_INTERVAL_MS = 20_000;
-const PENALTY_DURATION_MS = 60 * 60 * 1000; // 1 Hour
+const PENALTY_DURATION_MS = 60 * 60 * 1000;
 
-// The "Penalty Box" - stores modelId: unlockTimestamp
 let penalizedModels = new Map();
+const MODEL_PRIORITY_LIST = ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo"];
 
-const MODEL_PRIORITY_LIST = [
-  "gpt-4.1-mini",
-  "gpt-4.1-nano",
-  "gpt-4o-mini",
-  "gpt-4.1-mini-2025-04-14",
-  "gpt-4.1-nano-2025-04-14",
-  "gpt-4o-mini-2024-07-18"
-];
+/* ---------------- THE SCRIBE (Gemini) ---------------- */
 
-/* ---------------- HELPERS ---------------- */
+async function summarizeHistory(messages) {
+  const summaryPrompt = `
+    MASTER RECORD: ${conversationSummary || "The annals are empty."}
+    NEW CHRONICLES:
+    ${messages.map(m => `${m.displayName}: ${m.text}`).join("\n")}
+    
+    TASK: You are the Eternal Scribe of Crousia. Update the MASTER RECORD with the NEW CHRONICLES. 
+    - Maintain the sovereign tone of King David's reign.
+    - Condense philosophical points into dense, high-value principles.
+    - STRICT LIMIT: Under 200 words.
+    - Output only the updated record.
+  `;
+  try {
+    console.log(`[SCRIBE] Gemini is recording the history...`);
+    const result = await scribeModel.generateContent(summaryPrompt);
+    return result.response.text().trim();
+  } catch (e) { 
+    console.error("Scribe Error:", e);
+    return conversationSummary; 
+  }
+}
+
+/* ---------------- THE GOD (OpenAI) ---------------- */
 
 async function chatWithFallback(payload, taskName = "Completion") {
   const now = Date.now();
-
   for (const modelId of MODEL_PRIORITY_LIST) {
     if (penalizedModels.has(modelId)) {
       if (now < penalizedModels.get(modelId)) continue;
       penalizedModels.delete(modelId);
     }
-
     try {
-      console.log(`[${new Date().toISOString()}] Attempting ${taskName} with: ${modelId}`);
+      console.log(`[GOD] Attempting ${taskName} with ${modelId}`);
       return await openai.chat.completions.create({ ...payload, model: modelId });
-
     } catch (err) {
-      const errMsg = err.message.toLowerCase();
-      const isQuota = err.status === 429 || errMsg.includes("quota") || errMsg.includes("rate limit");
-      const isNotFound = err.status === 404 || err.status === 400 || errMsg.includes("not found");
-
-      if (isQuota) {
-        console.warn(`[PENALIZING] ${modelId} - Limit reached. 1-hour timeout.`);
+      if (err.status === 429) {
+        console.warn(`[PENALTY] ${modelId} timed out.`);
         penalizedModels.set(modelId, now + PENALTY_DURATION_MS);
-        continue; 
+        continue;
       }
-
-      if (isNotFound) {
-        console.warn(`[SKIPPING] ${modelId} - Model unavailable or invalid name.`);
-        continue; // Keep looking for a working model!
-      }
-
-      // If it's something truly weird (like a bad API key), stop everything.
-      throw err; 
+      continue;
     }
   }
-  throw new Error("The Heavens are silent. All models failed or are penalized.");
-}
-
-/* ---------------- LOGIC ---------------- */
-
-async function summarizeHistory(messages) {
-  const summaryPrompt = `
-    MASTER RECORD: ${conversationSummary || "No previous history."}
-    
-    NEW UPDATES:
-    ${messages.map(m => `${m.displayName}: ${m.text}`).join("\n")}
-    
-    TASK: Update the MASTER RECORD with the NEW UPDATES. 
-    - Maintain the core narrative of Crousia and the King's decrees.
-    - STRICT LIMIT: Keep the final output under 500 words. 
-    - If the record is getting too long, consolidate older details but keep the most important facts.
-  `;
-
-  try {
-    const result = await chatWithFallback({
-      messages: [
-        { role: "system", content: "You are the Eternal Scribe of Crousia. You specialize in dense, recursive summarization." },
-        { role: "user", content: summaryPrompt }
-      ],
-      temperature: 0.3
-    }, "Summarization");
-    
-    return result.choices[0].message.content.trim();
-  } catch (e) { 
-    return conversationSummary; 
-  }
+  throw new Error("The Heavens are silent.");
 }
 
 async function processLLMQueue() {
@@ -119,8 +95,8 @@ async function processLLMQueue() {
   try {
     const completion = await chatWithFallback({
       messages: [
-        { role: "system", content: "You are the Silent God of Crousia. Speak only in short, cryptic, or essential sentences. Do not offer unsolicited advice. Do not be overly polite. Be brief to save the King's tokens." },
-        ...(conversationSummary ? [{ role: "system", content: `History: ${conversationSummary}` }] : []),
+        { role: "system", content: "You are God.  Do not preface with 'God:'" },
+        ...(conversationSummary ? [{ role: "system", content: `Lore: ${conversationSummary}` }] : []),
         ...history.map(m => ({ role: "user", content: `${m.displayName}: ${m.text}` })),
         { role: "user", content: "Respond to:\n" + batch.map(m => `${m.displayName}: ${m.text}`).join("\n") }
       ],
@@ -132,7 +108,7 @@ async function processLLMQueue() {
     history.push(llmMsg);
     io.emit("message", llmMsg);
   } catch (err) {
-    console.error("Queue Processing Failed: All models penalized.");
+    console.error("Queue Processing Failed.");
   }
 
   setTimeout(() => {
@@ -142,21 +118,25 @@ async function processLLMQueue() {
   }, LLM_INTERVAL_MS);
 }
 
-/* ---------------- HEARTBEAT & SOCKETS ---------------- */
+/* ---------------- HEARTBEAT & CLEANUP ---------------- */
 
+// REST Pinger for external monitoring
+app.get("/heartbeat", (_, res) => res.send("OK"));
+
+// User activity monitor: Prunes users after 30 mins of silence
 setInterval(() => {
   const now = Date.now();
   for (const [id, user] of Object.entries(users)) {
     if (now - user.lastActive > 1000 * 60 * 30) {
+      console.log(`[SYSTEM] Pruning inactive user: ${user.name}`);
       delete users[id];
       io.emit("userLeft", { name: user.name });
     }
   }
 }, 60 * 1000);
 
-app.get("/heartbeat", (_, res) => res.send("OK"));
+/* ---------------- API ENDPOINTS ---------------- */
 
-// Access the Royal Archives via Terminal
 app.get("/summary", (_, res) => {
   res.json({
     kingdom: "Crousia",
@@ -166,6 +146,8 @@ app.get("/summary", (_, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+/* ---------------- SOCKET LOGIC ---------------- */
 
 io.on("connection", (socket) => {
   socket.on("join", ({ name }) => {
@@ -189,31 +171,28 @@ io.on("connection", (socket) => {
 
     if (text.startsWith("/")) return;
 
-    // --- THE SEQUENTIAL FIX ---
+    // Sequential Summarization Logic
     if (history.length > SUMMARIZE_AFTER) {
       const old = history.slice(0, history.length - MAX_RAW_MESSAGES);
-      
-      // We MUST await this so the API request finishes 
-      // before processLLMQueue starts the next one.
-      console.log("[SYSTEM] Starting sequential summary...");
+      console.log("[SYSTEM] Scribe taking dictation...");
       conversationSummary = await summarizeHistory(old);
-      
       history = history.slice(-MAX_RAW_MESSAGES);
-      console.log("[SYSTEM] Summary complete. History truncated.");
+      console.log("[SYSTEM] Chronicles updated.");
     }
 
     pendingMessages.push(msg);
-    
-    // Now this only fires AFTER the summary request is totally done.
     processLLMQueue();
   });
 
   socket.on("disconnect", () => {
     const user = users[socket.id];
-    if (user) { delete users[socket.id]; io.emit("userLeft", { name: user.name }); }
+    if (user) { 
+      delete users[socket.id]; 
+      io.emit("userLeft", { name: user.name }); 
+    }
   });
 });
 
 server.listen(process.env.PORT || 3000, () => {
-  console.log("God-Telephone Server Active with 1-Hour Penalty Logic");
+  console.log("God-Telephone: Dual-Engine active with Heartbeat Monitoring.");
 });
