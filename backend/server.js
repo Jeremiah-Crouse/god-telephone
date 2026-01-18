@@ -16,7 +16,7 @@ const io = new Server(server, { cors: { origin: "*" } });
 // --- INITIALIZE ENGINES ---
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const scribeModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const scribeModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 /* ---------------- STATE ---------------- */
 let history = [];
