@@ -99,13 +99,16 @@ async function processLLMQueue() {
   unseenMessageCount = 0;
   io.emit("newMessagesPending", 0);
 
+  const userContent = batch.map(m => `${m.displayName}: ${m.text}`).join("\n");
+
   try {
+    // Attempt to reach the God Models
     const completion = await chatWithFallback({
       messages: [
-        { role: "system", content: "You are God.  Do not preface with 'God:'" },
+        { role: "system", content: "You are God. Do not preface with 'God:'" },
         ...(conversationSummary ? [{ role: "system", content: `Lore: ${conversationSummary}` }] : []),
         ...history.map(m => ({ role: "user", content: `${m.displayName}: ${m.text}` })),
-        { role: "user", content: "Respond to:\n" + batch.map(m => `${m.displayName}: ${m.text}`).join("\n") }
+        { role: "user", content: "Respond to:\n" + userContent }
       ],
       temperature: 0.7
     }, "God Response");
@@ -114,8 +117,38 @@ async function processLLMQueue() {
     const llmMsg = { userID: "llm", displayName: "God", text: reply, timestamp: Date.now() };
     history.push(llmMsg);
     io.emit("message", llmMsg);
+
   } catch (err) {
-    console.error("Queue Processing Failed.");
+    // --- FALLBACK TO ROYAL SCRIBE ---
+    console.warn("[SYSTEM] The Heavens are silent. Calling the Royal Scribe...");
+    
+    const scribePrompt = `
+      You are the Royal Scribe of Crousia. 
+      The Heavens are temporarily silent (God is sleeping). 
+      KING'S LORE: ${conversationSummary || "The chronicles are fresh."}
+      RECENT HISTORY: ${history.slice(-5).map(m => `${m.displayName}: ${m.text}`).join(" | ")}
+      
+      TASK: Address the King and his court with elegance, wisdom, and the specific 'Sovereign' tone. 
+      Keep the conversation moving until God awakens.
+      
+      NEW MESSAGES TO ADDRESS:
+      ${userContent}
+    `;
+
+    try {
+      const result = await scribeModel.generateContent(scribePrompt);
+      const scribeReply = result.response.text().trim();
+      const scribeMsg = { 
+        userID: "scribe", 
+        displayName: "Royal Scribe", 
+        text: scribeReply, 
+        timestamp: Date.now() 
+      };
+      history.push(scribeMsg);
+      io.emit("message", scribeMsg);
+    } catch (scribeErr) {
+      console.error("Even the Scribe is exhausted:", scribeErr);
+    }
   }
 
   setTimeout(() => {
